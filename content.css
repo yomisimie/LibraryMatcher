@@ -216,6 +216,54 @@
   font-weight: 400;
 }
 
+/* ---------- Compact list rows (.product-tile--list, e.g. bestsellers) ---------- */
+
+/* Icon + symbol only, in the corner of the narrow cover. */
+.slm-badge.slm-compact {
+  top: 4px;
+  right: 4px;
+  gap: 3px;
+  padding: 2px 6px 2px 2px;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+/* Owned: the badge sits on the cover, so dim the cover picture and the info
+   column instead of the cover wrapper (which would dim the badge too). */
+.slm-owned.slm-compact > :not(.slm-ui) {
+  opacity: 1 !important;
+  filter: none;
+}
+
+.slm-owned.slm-compact store-picture,
+.slm-owned.slm-compact .product-tile__info {
+  opacity: 0.3 !important;
+  filter: grayscale(0.6);
+  transition: opacity 0.15s ease;
+}
+
+.slm-owned.slm-compact:hover store-picture,
+.slm-owned.slm-compact:hover .product-tile__info {
+  opacity: 0.7 !important;
+}
+
+/* Price card: one line in the row's footer, between GOG's heart and price. */
+.slm-price-card.slm-compact {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: none;
+  margin: 0 auto 0 10px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.slm-price-card.slm-compact .slm-verdict {
+  margin-top: 0;
+}
+
 /* ---------- Clickable (opens the Steam page) ---------- */
 
 .slm-link {

@@ -4,6 +4,14 @@ All notable changes to Library Matcher for Steam & GOG, newest first.
 `npm run bump` adds a heading for the new version; write that version's
 changes under it.
 
+## [0.2.2] - 2026-11-23
+
+### Fixed
+- Compact list rows on GOG (e.g. the bestsellers list): the Steam badge and
+  price no longer overlap on the small cover. The badge shows just the Steam
+  icon with ♥ or ✓, and the price comparison sits on one line next to GOG's
+  price.
+
 ## [0.2.1] - 2026-11-23
 
 ### Changed

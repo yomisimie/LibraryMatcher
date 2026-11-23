@@ -79,6 +79,7 @@ const MARK_CLASSES = [
   "slm-ignored",
   "slm-hidden",
   "slm-extended",
+  "slm-compact",
 ];
 
 // Remove everything we added, so a fresh pass reflects the current lists
@@ -131,9 +132,19 @@ function steamIcon(size) {
   return img;
 }
 
-function createBadge(kind, text, tooltip, appid) {
+// Compact list rows (e.g. the bestsellers list) have a cover only ~80px
+// wide: badges there show just the icon and a symbol, and the price card
+// goes in the row's footer instead of over the cover.
+const COMPACT_TILE_SELECTOR = ".product-tile--list";
+
+function isCompact(tile) {
+  return tile.matches(COMPACT_TILE_SELECTOR);
+}
+
+function createBadge(kind, text, tooltip, appid, compact = false) {
   const badge = document.createElement("span");
   badge.className = `slm-ui slm-badge steam-${kind}-badge`;
+  if (compact) badge.classList.add("slm-compact");
   badge.title = appid ? `${tooltip} (click to open on Steam)` : tooltip;
   const label = document.createElement("span");
   label.textContent = text;
@@ -142,12 +153,18 @@ function createBadge(kind, text, tooltip, appid) {
   return badge;
 }
 
-function createOwnedBadge(appid) {
-  return createBadge("owned", "Owned", "Owned on Steam", appid);
+function createOwnedBadge(appid, compact) {
+  return createBadge("owned", compact ? "✓" : "Owned", "Owned on Steam", appid, compact);
 }
 
-function createWishlistBadge(appid) {
-  return createBadge("wishlist", "♥ Wishlist", "On your Steam wishlist", appid);
+function createWishlistBadge(appid, compact) {
+  return createBadge(
+    "wishlist",
+    compact ? "♥" : "♥ Wishlist",
+    "On your Steam wishlist",
+    appid,
+    compact,
+  );
 }
 
 // ---------- Price comparison ----------
@@ -338,7 +355,14 @@ async function addSteamPrice(tile, titleEl, title, match) {
 
   makeSteamLink(card, match.appid || hit.appid);
   tile.querySelector(".slm-price-card")?.remove();
-  getHost(tile).appendChild(card);
+  // Compact rows: between GOG's wishlist heart and its price.
+  const footer = isCompact(tile) && tile.querySelector(".product-tile__footer");
+  if (footer) {
+    card.classList.add("slm-compact");
+    footer.insertBefore(card, footer.querySelector(".product-tile__price-info"));
+  } else {
+    getHost(tile).appendChild(card);
+  }
 }
 
 // ---------- Ignore list ----------
@@ -479,6 +503,9 @@ async function markOwnedGames() {
       tile.appendChild(createIgnoreButton(gogTitle, rawTitle, false, extended));
     }
 
+    const compact = isCompact(tile);
+    if (compact) tile.classList.add("slm-compact");
+
     const owned = lookup(ownedMap, gogTitle);
     if (owned) {
       if (tile.querySelector(".steam-owned-badge")) return;
@@ -487,7 +514,8 @@ async function markOwnedGames() {
         .querySelectorAll(".steam-wishlist-badge, .slm-price-card")
         .forEach((el) => el.remove());
       tile.classList.add("slm-owned");
-      tile.appendChild(createOwnedBadge(owned.appid));
+      // Compact rows: on the cover (the CSS keeps it undimmed there).
+      (compact ? getHost(tile) : tile).appendChild(createOwnedBadge(owned.appid, compact));
       return;
     }
 
@@ -499,7 +527,7 @@ async function markOwnedGames() {
 
     if (wish && !tile.querySelector(".steam-wishlist-badge")) {
       tile.classList.add("slm-wishlist");
-      getHost(tile).appendChild(createWishlistBadge(wish.appid));
+      getHost(tile).appendChild(createWishlistBadge(wish.appid, compact));
     }
     if (showPrices) {
       addSteamPrice(tile, titleEl, rawTitle, wish || { appid: null, exact: true });
