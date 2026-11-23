@@ -1,0 +1,31 @@
+{
+  "name": "steam-library-matcher",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Firefox extension: marks games you own or wishlisted on Steam while browsing GOG, and compares prices",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "start": "web-ext run",
+    "lint": "web-ext lint",
+    "package": "node scripts/clean-dist.js && web-ext build",
+    "bump": "node scripts/bump-version.js"
+  },
+  "webExt": {
+    "sourceDir": ".",
+    "artifactsDir": "dist",
+    "ignoreFiles": [
+      "package.json",
+      "package-lock.json",
+      "scripts",
+      "dist",
+      "*.md"
+    ],
+    "build": {
+      "overwriteDest": true
+    }
+  },
+  "devDependencies": {
+    "web-ext": "10.8.0"
+  }
+}

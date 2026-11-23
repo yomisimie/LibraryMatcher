@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 220px;
+        padding: 10px;
+        font-family: sans-serif;
+        background: #1a1a1a;
+        color: #fff;
+        margin: 0;
+      }
+      button {
+        width: 100%;
+        padding: 8px;
+        margin: 4px 0;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .btn-options {
+        background: #3a3a3a;
+        color: #ddd;
+      }
+      .btn-sync {
+        background: #66c0f4;
+        color: #1b2838;
+      }
+      .btn-gog {
+        background: #86328a;
+        color: #fff;
+      }
+      .btn-wishlist {
+        background: #2a475e;
+        color: #a3ffb4;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #info {
+        font-size: 12px;
+        color: #aaa;
+        line-height: 1.5;
+        margin: 6px 0 4px;
+      }
+      #info strong {
+        color: #ddd;
+      }
+      #status {
+        font-size: 13px;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 8px;
+        padding: 4px;
+        min-height: 1em;
+      }
+      #status.error {
+        color: #ff8888;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">Loading…</div>
+    <button id="syncBtn" class="btn-sync">🔄 Sync Steam Library</button>
+    <button id="wishlistBtn" class="btn-wishlist">✨ Sync Steam Wishlist</button>
+    <button id="gogWishlistBtn" class="btn-gog">🔎 Steam wishlist on GOG</button>
+    <button id="optionsBtn" class="btn-options">⚙️ Settings</button>
+    <div id="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

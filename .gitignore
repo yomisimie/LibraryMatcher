@@ -1,0 +1,10 @@
+node_modules/
+
+# Packaged extension builds (npm run package writes to dist/)
+dist/
+*.zip
+*.xpi
+web-ext-artifacts/
+
+.DS_Store
+*.log

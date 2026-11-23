@@ -1,0 +1,272 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Steam Wishlist on GOG</title>
+    <style>
+      :root {
+        --bg: #16191d;
+        --panel: #1f2329;
+        --row: #22272e;
+        --border: #2f353d;
+        --text: #e3e6e8;
+        --muted: #8f98a0;
+        --steam: #66c0f4;
+        --gog: #a4d007;
+        --gog-btn: #86328a;
+        --warn: #e0b04d;
+        --danger: #ff8888;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.45 "Motiva Sans", "Segoe UI", Arial, sans-serif;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 22px;
+        color: var(--steam);
+      }
+      .sub {
+        margin: 0 0 18px;
+        color: var(--muted);
+      }
+      a {
+        color: inherit;
+      }
+
+      /* ---------- Toolbar ---------- */
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        margin-bottom: 12px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .filters {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .filters button {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+      }
+      .filters button.active {
+        color: var(--text);
+        border-color: var(--steam);
+        background: rgba(102, 192, 244, 0.12);
+      }
+      /* Action buttons stay together and right-aligned, even when the
+         toolbar wraps on narrow windows. */
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+      }
+      /* Fixed width so the button doesn't jump as its count changes. */
+      #addAllBtn {
+        min-width: 210px;
+      }
+      button {
+        padding: 7px 12px;
+        border: none;
+        border-radius: 5px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .btn-primary {
+        background: var(--gog-btn);
+        color: #fff;
+      }
+      .btn-secondary {
+        background: #2f353d;
+        color: var(--text);
+      }
+
+      /* ---------- Status banners ---------- */
+      .banner {
+        padding: 10px 12px;
+        margin-bottom: 12px;
+        border-radius: 6px;
+        background: rgba(224, 176, 77, 0.12);
+        border: 1px solid rgba(224, 176, 77, 0.4);
+        color: var(--warn);
+      }
+      .banner[hidden] {
+        display: none;
+      }
+      #progress {
+        margin: 0 0 6px 2px;
+        color: var(--muted);
+        font-size: 13px;
+        min-height: 1.45em;
+      }
+
+      /* ---------- Table ---------- */
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 4px;
+      }
+      th {
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        padding: 4px 10px;
+      }
+      td {
+        background: var(--row);
+        padding: 9px 10px;
+        vertical-align: middle;
+      }
+      td:first-child {
+        border-radius: 6px 0 0 6px;
+      }
+      td:last-child {
+        border-radius: 0 6px 6px 0;
+        text-align: right;
+      }
+      tr.dim td {
+        opacity: 0.55;
+      }
+      .title {
+        font-weight: 600;
+      }
+      .title a {
+        text-decoration: none;
+      }
+      .title a:hover,
+      .gog-title a:hover {
+        text-decoration: underline;
+      }
+      .gog-title a {
+        text-decoration: none;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .tag {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 0 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+        vertical-align: 1px;
+      }
+      .tag-edition {
+        background: rgba(224, 176, 77, 0.15);
+        color: var(--warn);
+      }
+      .tag-discount {
+        background: #4c6b22;
+        color: var(--gog);
+      }
+      .price {
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .best-gog {
+        color: var(--gog);
+        font-weight: 600;
+      }
+      .best-steam {
+        color: var(--steam);
+        font-weight: 600;
+      }
+      .status-ok {
+        color: var(--gog);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .status-err {
+        color: var(--danger);
+        font-size: 12px;
+      }
+
+      /* Narrow screens: hide secondary columns. */
+      @media (max-width: 760px) {
+        .col-steam,
+        .col-best {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Steam Wishlist on GOG</h1>
+      <p class="sub">
+        Your Steam wishlist matched against the GOG store, with prices from
+        both. Add games to your GOG wishlist in one click.
+      </p>
+
+      <div id="loginBanner" class="banner" hidden>
+        You're not logged in to GOG in this browser, so your GOG wishlist and
+        library can't be checked and games can't be added.
+        <a href="https://www.gog.com/" target="_blank" rel="noopener">Log in to GOG</a>,
+        then reload this page.
+      </div>
+      <div id="emptyBanner" class="banner" hidden></div>
+
+      <div class="toolbar">
+        <div class="filters" id="filters">
+          <button data-filter="all" class="active">All</button>
+          <button data-filter="addable">Can add</button>
+          <button data-filter="ongog">On GOG</button>
+          <button data-filter="notongog">Not on GOG</button>
+          <button data-filter="done" title="Already on your GOG wishlist or owned on GOG">
+            Already on GOG
+          </button>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" class="btn-secondary">🔄 Re-sync Steam wishlist</button>
+          <button id="addAllBtn" class="btn-primary" disabled>+ Add all to GOG wishlist</button>
+        </div>
+      </div>
+      <p id="progress"></p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Steam wishlist</th>
+            <th>On GOG</th>
+            <th>GOG price</th>
+            <th class="col-steam">Steam price</th>
+            <th class="col-best">Cheaper</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </main>
+
+    <script src="normalize.js"></script>
+    <script src="wishlist.js"></script>
+  </body>
+</html>

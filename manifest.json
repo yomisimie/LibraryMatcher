@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Library Matcher for Steam & GOG",
+  "short_name": "Library Matcher",
+  "description": "While browsing GOG, marks games you already own or wishlisted on Steam, compares prices, and hides games you ignore.",
+  "version": "0.2.1",
+  "homepage_url": "https://github.com/yomisimie/LibraryMatcher",
+
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "steam-library-matcher@yomisimie",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["authenticationInfo", "websiteContent"]
+      }
+    }
+  },
+
+  "background": {
+    "scripts": ["normalize.js", "ignore.js", "background.js"]
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://*.gog.com/*"],
+      "js": ["normalize.js", "ignore.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "permissions": ["storage", "alarms", "menus"],
+
+  "host_permissions": [
+    "https://api.steampowered.com/*",
+    "https://store.steampowered.com/*",
+    "https://*.gog.com/*",
+    "https://api.frankfurter.dev/*"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["steam-badge.svg"],
+      "matches": ["https://*.gog.com/*"]
+    }
+  ],
+
+  "action": {
+    "default_title": "Library Matcher for Steam & GOG",
+    "default_icon": "icon.svg",
+    "default_popup": "popup.html"
+  },
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

@@ -1,0 +1,227 @@
+/* Steam Library Matcher. Classes are added by content.js; every element we
+   inject carries .slm-ui. Overlays sit on the cover art (.slm-host) so they
+   never cover GOG's title or price row. */
+
+:root {
+  --slm-steam-bg: rgba(23, 29, 37, 0.92);
+  --slm-steam-blue: #66c0f4;
+  --slm-text: #dfe3e6;
+  --slm-muted: #8f98a0;
+  --slm-green: #a4d007;
+  --slm-green-bg: #4c6b22;
+}
+
+.slm-owned,
+.slm-host,
+.slm-tile {
+  position: relative;
+}
+
+/* ---------- Ignored games ---------- */
+
+.slm-hidden {
+  display: none !important;
+}
+
+.slm-ignored > :not(.slm-ui) {
+  opacity: 0.15 !important;
+  filter: grayscale(1);
+}
+
+/* Top-left of the tile; shown on hover, always shown on ignored tiles. */
+.slm-ignore-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 11;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--slm-steam-bg);
+  color: var(--slm-text);
+  font: 600 11px/1 "Motiva Sans", Arial, sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.slm-tile:hover > .slm-ignore-btn,
+.slm-ignored > .slm-ignore-btn,
+.slm-extended > .slm-ignore-btn {
+  opacity: 1;
+}
+
+/* GOG's hover card: its WISHLISTED/discount label sits on the top-left
+   corner, so the labelled button goes below it. */
+.slm-extended > .slm-ignore-btn {
+  top: 30px;
+  height: 24px;
+  padding: 0 9px;
+}
+
+.slm-ignore-btn:hover {
+  background: #8b2a2a;
+  color: #fff;
+}
+
+.slm-ignored > .slm-ignore-btn:hover {
+  background: rgba(42, 71, 94, 0.95);
+}
+
+/* ---------- Owned on Steam: dim the whole tile ---------- */
+
+.slm-owned > :not(.slm-ui) {
+  opacity: 0.3 !important;
+  filter: grayscale(0.6);
+  transition: opacity 0.15s ease;
+}
+
+.slm-owned:hover > :not(.slm-ui) {
+  opacity: 0.7 !important;
+}
+
+/* ---------- Wishlisted on Steam: outline, no dimming ---------- */
+
+.slm-wishlist {
+  box-shadow:
+    0 0 0 2px var(--slm-steam-blue),
+    0 0 14px rgba(102, 192, 244, 0.35) !important;
+  border-radius: 4px;
+}
+
+/* ---------- Corner badges (top-right of the cover) ---------- */
+
+.slm-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 999px;
+  background: var(--slm-steam-bg);
+  color: var(--slm-text);
+  font: 600 11px/1.4 "Motiva Sans", Arial, sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.steam-wishlist-badge {
+  color: var(--slm-steam-blue);
+}
+
+/* GOG styles every <img> in the cover area to fill it (absolute, 100%),
+   so the icon needs hard overrides to stay a small inline logo. */
+.slm-ui img.slm-icon {
+  display: block !important;
+  position: static !important;
+  inset: auto !important;
+  flex: none !important;
+  width: var(--slm-icon-size, 16px) !important;
+  height: var(--slm-icon-size, 16px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  object-fit: contain !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+.slm-badge {
+  --slm-icon-size: 16px;
+}
+
+.slm-price-card {
+  --slm-icon-size: 14px;
+}
+
+/* ---------- Steam price card (bottom-left of the cover) ---------- */
+
+.slm-price-card {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 10;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--slm-steam-bg);
+  color: var(--slm-text);
+  font: 12px/1.35 "Motiva Sans", Arial, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.slm-price-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.slm-price {
+  font-weight: 700;
+  color: #fff;
+}
+
+.slm-discount {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--slm-green-bg);
+  color: var(--slm-green);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.slm-converted {
+  color: var(--slm-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slm-verdict {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.slm-verdict--steam {
+  color: var(--slm-steam-blue);
+}
+
+.slm-verdict--gog {
+  color: var(--slm-green);
+}
+
+.slm-verdict--same,
+.slm-verdict--na {
+  color: var(--slm-muted);
+  font-weight: 400;
+}
+
+/* ---------- Clickable (opens the Steam page) ---------- */
+
+.slm-link {
+  cursor: pointer;
+}
+
+.slm-link:hover {
+  background: rgba(42, 71, 94, 0.95);
+}

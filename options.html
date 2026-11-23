@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #1a1a1a;
+        color: #fff;
+        padding: 30px;
+        max-width: 400px;
+        margin: 0 auto;
+      }
+      h2 {
+        color: #66c0f4;
+      }
+      label {
+        display: block;
+        margin: 15px 0 5px;
+        font-weight: bold;
+        font-size: 14px;
+      }
+      input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #333;
+        background: #2a2a2a;
+        color: #fff;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 20px;
+        background: #66c0f4;
+        color: #1b2838;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+      h3 {
+        color: #66c0f4;
+        margin-top: 28px;
+        font-size: 16px;
+      }
+      label.checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: normal;
+      }
+      label.checkbox input {
+        width: auto;
+      }
+      .hint {
+        font-size: 12px;
+        color: #999;
+        margin: 6px 0 0;
+      }
+      .ignored-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 0;
+      }
+      .ignored-list li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px solid #333;
+        font-size: 14px;
+      }
+      .ignored-list button {
+        width: auto;
+        margin: 0;
+        padding: 4px 10px;
+        background: #333;
+        color: #ddd;
+        font-weight: normal;
+        flex: none;
+      }
+      a {
+        color: #66c0f4;
+      }
+      code {
+        background: #2a2a2a;
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+      .status {
+        margin-top: 15px;
+        font-size: 13px;
+        text-align: center;
+        color: #a3ffb4;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Library Matcher setup</h2>
+    <p>
+      Enter your Steam ID and a Steam Web API key to sync your Steam library
+      and wishlist. Both stay in your browser and are only sent to Steam.
+    </p>
+
+    <label for="steamId">SteamID64 (17 digits):</label>
+    <input type="text" id="steamId" placeholder="e.g., 76561198000000000" />
+    <p class="hint">
+      Find it on your
+      <a href="https://store.steampowered.com/account/" target="_blank" rel="noopener">Steam account page</a>
+      ("Steam ID" under your account name, sign-in needed). If your profile
+      link looks like <code>steamcommunity.com/profiles/7656…</code>, that
+      number is it.
+    </p>
+
+    <label for="apiKey">Steam Web API Key:</label>
+    <input type="password" id="apiKey" placeholder="Paste API key here" />
+    <p class="hint">
+      Get one at
+      <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">steamcommunity.com/dev/apikey</a>.
+      For "Domain Name" enter anything, e.g. <code>localhost</code>.
+      Steam only issues keys to accounts that have spent at least $5.
+    </p>
+
+    <h3>Price comparison</h3>
+    <label class="checkbox">
+      <input type="checkbox" id="showSteamPrices" checked />
+      Show Steam prices on games wishlisted on Steam or GOG
+    </label>
+
+    <label for="steamCountry">Steam store country (2-letter code):</label>
+    <input type="text" id="steamCountry" maxlength="2" placeholder="e.g. RO, US, DE" />
+    <p class="hint">
+      Which Steam regional store to price against. Leave empty to pick it
+      from the currency GOG shows you (e.g. lei → Romania). Prices in a
+      different currency are converted at the daily ECB rate.
+    </p>
+
+    <button id="saveBtn">Save & Sync Library</button>
+    <div id="status" class="status"></div>
+
+    <h3>Ignored games</h3>
+    <p class="hint">
+      To ignore a game on GOG, right-click it and choose Ignore, or hover
+      it and click ✕. Changes here apply
+      immediately. The list syncs across your devices through Firefox Sync
+      when "Add-ons" is enabled in your Sync settings.
+    </p>
+    <label class="checkbox">
+      <input type="checkbox" id="dimIgnoredGames" />
+      Show ignored games dimmed (with an Unignore button) instead of hiding them
+    </label>
+    <ul id="ignoredList" class="ignored-list"></ul>
+    <p id="ignoredEmpty" class="hint">No ignored games.</p>
+
+    <script src="ignore.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
