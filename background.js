@@ -5,6 +5,9 @@
 //   steamOwnedSyncedAt, steamWishlistSyncedAt   ms timestamps of last success
 //   lastSyncError                      message from the last failed auto sync
 //   showSteamPrices, steamCountry      price comparison settings
+//   gogCurrency                        currency code for GOG prices shown
+//                                      without one ("" = auto)
+//   gogCurrencyDetected                last currency seen in a GOG price
 //   steamPriceCache                    { "cc|title": { ts, hit } }
 //   dimIgnoredGames                    dim ignored tiles instead of hiding them
 // browser.storage.sync (Firefox Sync, see ignore.js):

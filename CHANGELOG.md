@@ -4,6 +4,20 @@ All notable changes to Library Matcher for Steam & GOG, newest first.
 `npm run bump` adds a heading for the new version; write that version's
 changes under it.
 
+## [0.3.0] - 2026-11-26
+
+### Added
+- Your GOG wishlist page now shows the Steam badges (owned / on your Steam
+  wishlist) and the Steam price comparison, in a strip under each game's
+  title.
+- "Your GOG currency" setting. Some GOG pages, like your wishlist, show
+  prices without a currency sign; Steam prices there are converted to this
+  currency. On Auto it uses the last currency seen on a GOG store page.
+
+### Fixed
+- Save & Sync asks Firefox for access to Steam's servers when the extension
+  doesn't have it yet, instead of failing with "NetworkError".
+
 ## [0.2.2] - 2026-11-23
 
 ### Fixed

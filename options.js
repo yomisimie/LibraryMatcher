@@ -5,12 +5,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     "apiKey",
     "showSteamPrices",
     "steamCountry",
+    "gogCurrency",
+    "gogCurrencyDetected",
   ]);
   if (data.steamId) document.getElementById("steamId").value = data.steamId;
   if (data.apiKey) document.getElementById("apiKey").value = data.apiKey;
   document.getElementById("showSteamPrices").checked =
     data.showSteamPrices !== false;
   document.getElementById("steamCountry").value = data.steamCountry || "";
+  document.getElementById("gogCurrency").value = data.gogCurrency || "";
+  document.getElementById("gogCurrencyAuto").textContent = data.gogCurrencyDetected
+    ? `Auto (last seen: ${data.gogCurrencyDetected})`
+    : "Auto (not seen yet: open a GOG store page)";
   renderIgnored();
 });
 
@@ -63,6 +69,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     .getElementById("steamCountry")
     .value.trim()
     .toUpperCase();
+  const gogCurrency = document.getElementById("gogCurrency").value;
 
   if (!steamId || !apiKey) {
     status.style.color = "#ff8888";
@@ -75,6 +82,19 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     return;
   }
 
+  // Firefox treats MV3 host permissions as optional, so a fresh install
+  // (or a temporary add-on) may not have them, and every Steam request then
+  // fails as a bare NetworkError. Ask here: this needs the click's user
+  // gesture, so it must come before the first await in this handler.
+  const origins = browser.runtime.getManifest().host_permissions;
+  const granted = await browser.permissions.request({ origins });
+  if (!granted) {
+    status.style.color = "#ff8888";
+    status.textContent =
+      "Syncing needs access to Steam's servers. Allow it when Firefox asks, or under Permissions in about:addons.";
+    return;
+  }
+
   status.style.color = "#fff";
   status.textContent = "Saving configuration...";
 
@@ -84,6 +104,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     apiKey,
     showSteamPrices,
     steamCountry,
+    gogCurrency,
   });
 
   try {

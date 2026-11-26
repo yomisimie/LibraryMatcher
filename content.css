@@ -273,3 +273,45 @@
 .slm-link:hover {
   background: rgba(42, 71, 94, 0.95);
 }
+
+/* ---------- Wide list rows (.product-row-wrapper, your GOG wishlist) ---------- */
+
+/* Our strip under the title; content.js sets "left" to line up with it.
+   It's a direct child of the row, so the owned dimming above skips it. */
+.slm-row-slot {
+  position: absolute;
+  left: 110px;
+  bottom: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.slm-row-slot:empty {
+  display: none;
+}
+
+.slm-row-slot > * {
+  pointer-events: auto;
+}
+
+.slm-badge.slm-row,
+.slm-price-card.slm-row {
+  position: static;
+  box-shadow: none;
+}
+
+.slm-price-card.slm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: none;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.slm-price-card.slm-row .slm-verdict {
+  margin-top: 0;
+}

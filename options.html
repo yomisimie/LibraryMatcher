@@ -20,7 +20,8 @@
         font-weight: bold;
         font-size: 14px;
       }
-      input {
+      input,
+      select {
         width: 100%;
         padding: 8px;
         border: 1px solid #333;
@@ -139,6 +140,27 @@
       Which Steam regional store to price against. Leave empty to pick it
       from the currency GOG shows you (e.g. lei → Romania). Prices in a
       different currency are converted at the daily ECB rate.
+    </p>
+
+    <label for="gogCurrency">Your GOG currency:</label>
+    <select id="gogCurrency">
+      <option value="" id="gogCurrencyAuto">Auto</option>
+      <option value="RON">RON (lei)</option>
+      <option value="EUR">EUR (€)</option>
+      <option value="USD">USD ($)</option>
+      <option value="GBP">GBP (£)</option>
+      <option value="PLN">PLN (zł)</option>
+      <option value="CZK">CZK (Kč)</option>
+      <option value="CHF">CHF</option>
+      <option value="TRY">TRY (₺)</option>
+      <option value="BRL">BRL (R$)</option>
+      <option value="CAD">CAD (C$)</option>
+      <option value="AUD">AUD (A$)</option>
+    </select>
+    <p class="hint">
+      Some GOG pages, like your wishlist, show prices without a currency
+      sign. Steam prices there are converted to this currency. Auto uses the
+      last currency the extension saw on a GOG store page.
     </p>
 
     <button id="saveBtn">Save & Sync Library</button>

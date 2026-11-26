@@ -7,6 +7,11 @@ let showPrices = true;
 // Games the user chose to hide: { normalizedTitle: displayTitle }.
 let ignored = {};
 let dimIgnored = false;
+// Currency for GOG prices shown without one (e.g. "101.35" on the wishlist
+// page, where GOG adds "lei" with CSS): the setting, else the last currency
+// seen in a GOG price. Empty when neither is known.
+let gogCurrencySetting = "";
+let gogCurrencySeen = "";
 
 const STEAM_BADGE_URL = browser.runtime.getURL("steam-badge.svg");
 
@@ -18,11 +23,18 @@ const TITLE_SELECTOR =
 const TILE_SELECTOR =
   ".product-tile, a.product-tile-vertical, .product-row-wrapper, product-tile-extended > a";
 const EXTENDED_TILE_SELECTOR = "product-tile-extended > a";
-// GOG's own "WISHLISTED" label on a tile.
-const GOG_WISHLIST_SELECTOR = ".product-label--wishlisted";
+// GOG's own "WISHLISTED" label on a tile, or a row on your GOG wishlist page.
+const GOG_WISHLIST_SELECTOR = ".product-label--wishlisted, .product-row.is-wishlisted";
 // Areas where tiles are games you already own on GOG (your library page),
 // which use the same tile markup but must be left alone.
 const SKIP_AREA_SELECTOR = ".account__product-lists";
+// Your GOG wishlist page shares that account layout, but lists games you
+// don't own on GOG yet, so it is marked like the store.
+const ACCOUNT_WISHLIST_SELECTOR = ".account__products--wishlist";
+
+function inSkipArea(el) {
+  return !!el.closest(SKIP_AREA_SELECTOR) && !el.closest(ACCOUNT_WISHLIST_SELECTOR);
+}
 
 function buildLookup(data) {
   const map = new Map();
@@ -58,7 +70,11 @@ async function loadLists() {
     "steamWishlistNames",
     "showSteamPrices",
     "dimIgnoredGames",
+    "gogCurrency",
+    "gogCurrencyDetected",
   ]);
+  gogCurrencySetting = data.gogCurrency || "";
+  gogCurrencySeen = data.gogCurrencyDetected || "";
   ownedMap = buildLookup(data.steamOwned || data.steamOwnedNames);
   wishlistMap = buildLookup(data.steamWishlist || data.steamWishlistNames);
   showPrices = data.showSteamPrices !== false;
@@ -80,6 +96,7 @@ const MARK_CLASSES = [
   "slm-hidden",
   "slm-extended",
   "slm-compact",
+  "slm-row",
 ];
 
 // Remove everything we added, so a fresh pass reflects the current lists
@@ -139,6 +156,24 @@ const COMPACT_TILE_SELECTOR = ".product-tile--list";
 
 function isCompact(tile) {
   return tile.matches(COMPACT_TILE_SELECTOR);
+}
+
+// Wide list rows (your GOG wishlist page) have a small cover with GOG's
+// price button beside it, and GOG clips anything added to the row's own
+// lines. So badges and the price card go in our own strip under the title,
+// lined up with it. Not inside the title element: its text is what's matched.
+const ROW_TILE_SELECTOR = ".product-row-wrapper";
+
+function rowSlot(tile, titleEl) {
+  let slot = tile.querySelector(":scope > .slm-row-slot");
+  if (!slot) {
+    slot = document.createElement("div");
+    slot.className = "slm-ui slm-row-slot";
+    tile.appendChild(slot);
+  }
+  const left = titleEl.getBoundingClientRect().left - tile.getBoundingClientRect().left;
+  if (left > 0) slot.style.left = `${Math.round(left)}px`;
+  return slot;
 }
 
 function createBadge(kind, text, tooltip, appid, compact = false) {
@@ -239,6 +274,13 @@ function findGogPrice(tile, titleEl) {
   return found;
 }
 
+// Remember the currency of a price GOG did label, for pages that don't.
+function rememberGogCurrency(code) {
+  if (!code || code === gogCurrencySeen) return;
+  gogCurrencySeen = code;
+  browser.storage.local.set({ gogCurrencyDetected: code }).catch(() => {});
+}
+
 function formatMoney(cents, currency) {
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
@@ -266,6 +308,15 @@ async function addSteamPrice(tile, titleEl, title, match) {
   tile.dataset.slmPrice = title;
 
   const gogPrice = findGogPrice(tile, titleEl);
+  if (gogPrice) {
+    if (gogPrice.currency) {
+      rememberGogCurrency(gogPrice.currency);
+    } else {
+      // The price on the page wins; the setting only fills in a missing one.
+      gogPrice.currency = gogCurrencySetting || gogCurrencySeen || null;
+      gogPrice.unlabelled = true;
+    }
+  }
 
   let hit;
   try {
@@ -316,7 +367,9 @@ async function addSteamPrice(tile, titleEl, title, match) {
     conv.className = "slm-converted";
     conv.textContent =
       "≈ " +
-      ((gogPrice?.text && formatLike(gogPrice.text, hit.converted / 100)) ||
+      ((gogPrice?.text &&
+        !gogPrice.unlabelled &&
+        formatLike(gogPrice.text, hit.converted / 100)) ||
         formatMoney(hit.converted, hit.convertedCurrency));
     row.appendChild(conv);
   }
@@ -357,7 +410,10 @@ async function addSteamPrice(tile, titleEl, title, match) {
   tile.querySelector(".slm-price-card")?.remove();
   // Compact rows: between GOG's wishlist heart and its price.
   const footer = isCompact(tile) && tile.querySelector(".product-tile__footer");
-  if (footer) {
+  if (tile.matches(ROW_TILE_SELECTOR)) {
+    card.classList.add("slm-row");
+    rowSlot(tile, titleEl).appendChild(card);
+  } else if (footer) {
     card.classList.add("slm-compact");
     footer.insertBefore(card, footer.querySelector(".product-tile__price-info"));
   } else {
@@ -404,7 +460,7 @@ function titleIn(el) {
 }
 
 function findGameTitle(target) {
-  if (!target || target.closest(SKIP_AREA_SELECTOR)) return null;
+  if (!target || inSkipArea(target)) return null;
 
   // 1. Inside a regular tile.
   const tile = target.closest(TILE_SELECTOR);
@@ -416,7 +472,7 @@ function findGameTitle(target) {
   if (href && /\/game\//.test(href)) {
     for (const t of document.querySelectorAll(TILE_SELECTOR)) {
       const link = t.matches("a[href]") ? t : t.querySelector("a[href]");
-      if (link?.href === href && !t.closest(SKIP_AREA_SELECTOR)) return titleIn(t);
+      if (link?.href === href && !inSkipArea(t)) return titleIn(t);
     }
   }
 
@@ -481,7 +537,7 @@ async function markOwnedGames() {
 
   document.querySelectorAll(TITLE_SELECTOR).forEach((titleEl) => {
     const tile = titleEl.closest(TILE_SELECTOR);
-    if (!tile || tile.closest(SKIP_AREA_SELECTOR)) return;
+    if (!tile || inSkipArea(tile)) return;
 
     const rawTitle = titleEl.textContent.trim();
     const gogTitle = normalizeTitle(rawTitle);
@@ -505,6 +561,17 @@ async function markOwnedGames() {
 
     const compact = isCompact(tile);
     if (compact) tile.classList.add("slm-compact");
+    const row = tile.matches(ROW_TILE_SELECTOR);
+    if (row) tile.classList.add("slm-row");
+    // Where the corner badge goes: under the title on wide rows, else the cover.
+    const placeBadge = (badge) => {
+      if (row) {
+        badge.classList.add("slm-row");
+        rowSlot(tile, titleEl).prepend(badge);
+      } else {
+        getHost(tile).appendChild(badge);
+      }
+    };
 
     const owned = lookup(ownedMap, gogTitle);
     if (owned) {
@@ -514,8 +581,10 @@ async function markOwnedGames() {
         .querySelectorAll(".steam-wishlist-badge, .slm-price-card")
         .forEach((el) => el.remove());
       tile.classList.add("slm-owned");
-      // Compact rows: on the cover (the CSS keeps it undimmed there).
-      (compact ? getHost(tile) : tile).appendChild(createOwnedBadge(owned.appid, compact));
+      const badge = createOwnedBadge(owned.appid, compact);
+      // Compact and wide rows: the CSS keeps the badge undimmed there.
+      if (compact || row) placeBadge(badge);
+      else tile.appendChild(badge);
       return;
     }
 
@@ -527,7 +596,7 @@ async function markOwnedGames() {
 
     if (wish && !tile.querySelector(".steam-wishlist-badge")) {
       tile.classList.add("slm-wishlist");
-      getHost(tile).appendChild(createWishlistBadge(wish.appid, compact));
+      placeBadge(createWishlistBadge(wish.appid, compact));
     }
     if (showPrices) {
       addSteamPrice(tile, titleEl, rawTitle, wish || { appid: null, exact: true });
@@ -574,6 +643,7 @@ const WATCHED_KEYS = [
   "showSteamPrices",
   "steamCountry",
   "dimIgnoredGames",
+  "gogCurrency",
 ];
 browser.storage.onChanged.addListener((changes, area) => {
   // Ignore-list changes arrive via sync, including from other devices.
