@@ -88,6 +88,19 @@ Every commit is a release, made in one commit:
 4. `npm run lint`.
 5. Commit everything together, titled `<summary> (x.y.z)`, and push to `main`.
 6. `npm run package` builds the upload zip in `dist/`.
+7. Write the release notes for the addons.mozilla.org upload form. Its
+   textarea keeps line breaks, so don't paste the wrapped `CHANGELOG.md`
+   text. Use this plain-text format: one line per item, blank lines between
+   items, no headings, and `Changed:` / `Fixed:` prefixes instead of
+   sections:
+
+   ```
+   New in 0.3.0
+
+   • Your GOG wishlist page now shows the Steam badges (owned on Steam / on your Steam wishlist) and the Steam price comparison, under each game's title.
+
+   • Fixed: "Save & Sync" could fail with "NetworkError" when the add-on hadn't been allowed to reach Steam's servers. It now asks for that permission when needed.
+   ```
 
 ## Publishing
 
