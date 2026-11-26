@@ -33,5 +33,28 @@ function baseTitle(normalized) {
   return base || normalized;
 }
 
+// Stores tell same-named games apart with a year: GOG sells "DOOM (2016)" and
+// "DOOM (1993)", while Steam calls the 2016 game just "DOOM". Splits that
+// year off a raw (not normalized) title; only a parenthesized year counts,
+// since "Cyberpunk 2077" or "Anno 1800" end in numbers that are the name.
+const YEAR_SUFFIX = /\s*\(((?:19|20)\d{2})\)\s*$/;
+
+function splitYear(name) {
+  const clean = String(name).replace(/[™®©℠]/g, "").trim();
+  const m = clean.match(YEAR_SUFFIX);
+  return m
+    ? { title: clean.slice(0, m.index), year: Number(m[1]) }
+    : { title: clean, year: null };
+}
+
+// A store's year and Steam's release date can straddle New Year (regional
+// launches, release vs. announcement), so allow one year either way. Same-named
+// games are remakes or reboots, years apart.
+function sameYear(a, b) {
+  return !!a && !!b && Math.abs(a - b) <= 1;
+}
+
 globalThis.normalizeTitle = normalizeTitle;
 globalThis.baseTitle = baseTitle;
+globalThis.splitYear = splitYear;
+globalThis.sameYear = sameYear;

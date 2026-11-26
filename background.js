@@ -13,6 +13,8 @@
 //                                      without one ("" = auto)
 //   gogCurrencyDetected                last currency seen in a GOG price
 //   steamPriceCache                    { "cc|title": { ts, hit } }
+//   steamReleaseYears                  { appid: year }, 0 = no date; for
+//                                      matching titles like "DOOM (2016)"
 //   dimIgnoredGames                    dim ignored tiles instead of hiding them
 // browser.storage.sync (Firefox Sync, see ignore.js):
 //   "ignore:<normalizedTitle>"         display title of each ignored game
@@ -382,13 +384,20 @@ function toHit(item, exact) {
 
 // Steam's search often finds nothing for full edition names, so retry with
 // the base title. Only results whose name really is this game are accepted.
+// A GOG title with a year ("DOOM (2016)") is also tried without it, but such a
+// result only counts when its Steam release year agrees: Steam's "DOOM" is
+// the 2016 game, not GOG's "DOOM (1993)".
 async function searchSteamStore(title, cc) {
   const wanted = normalizeTitle(title);
   const wantedBase = baseTitle(wanted);
+  const { title: undated, year } = splitYear(title);
+  const wantedUndated = year ? normalizeTitle(undated) : null;
   const terms = [title];
   if (wantedBase !== wanted) terms.push(wantedBase);
+  if (year) terms.push(undated);
 
   let baseMatch = null;
+  const dated = { exact: [], base: [] }; // undated-name candidates, year unchecked
   for (const term of terms) {
     const items = await storeSearch(term, cc);
     const exact = items.find((i) => normalizeTitle(i.name) === wanted);
@@ -396,8 +405,90 @@ async function searchSteamStore(title, cc) {
     baseMatch ||= items.find(
       (i) => baseTitle(normalizeTitle(i.name)) === wantedBase,
     );
+    if (!year) continue;
+    for (const i of items) {
+      const name = normalizeTitle(i.name);
+      if (name === wantedUndated) dated.exact.push(i);
+      else if (baseTitle(name) === baseTitle(wantedUndated)) dated.base.push(i);
+    }
+  }
+  if (dated.exact.length || (!baseMatch && dated.base.length)) {
+    const years = await getReleaseYears(
+      [...dated.exact, ...dated.base].map((i) => i.id),
+    );
+    const fits = (i) => sameYear(years[i.id], year);
+    const exactYear = dated.exact.find(fits);
+    if (exactYear) return toHit(exactYear, true);
+    if (!baseMatch) {
+      const baseYear = dated.base.find(fits);
+      if (baseYear) return toHit(baseYear, false);
+    }
   }
   return baseMatch ? toHit(baseMatch, false) : null;
+}
+
+// ---------- Release years ----------
+
+// { appid: year } in storage.local "steamReleaseYears", 0 when Steam has no
+// date (unreleased). Kept for good: release dates don't move once set. The
+// original release date wins over the Steam one, so a 1993 classic re-released
+// on Steam in 2007 counts as 1993.
+let releaseYearsWrite = Promise.resolve();
+
+async function fetchReleaseYears(appids) {
+  const input = {
+    ids: appids.map((appid) => ({ appid: Number(appid) })),
+    context: { language: "english", country_code: "US" },
+    data_request: { include_release: true },
+  };
+  const params = new URLSearchParams({ input_json: JSON.stringify(input) });
+  const res = await fetch(
+    `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?${params}`,
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const years = {};
+  for (const item of data.response?.store_items || []) {
+    if (!item.appid) continue;
+    const secs =
+      Number(item.release?.original_release_date) ||
+      Number(item.release?.steam_release_date);
+    years[item.appid] = secs ? new Date(secs * 1000).getUTCFullYear() : 0;
+  }
+  return years;
+}
+
+// Resolves to { appid: year } for the requested apps (missing on failure).
+async function getReleaseYears(appids) {
+  const { steamReleaseYears = {} } = await browser.storage.local.get(
+    "steamReleaseYears",
+  );
+  const missing = [...new Set(appids.map(String))].filter(
+    (id) => !(id in steamReleaseYears),
+  );
+  const fetched = {};
+  for (let i = 0; i < missing.length; i += 100) {
+    try {
+      Object.assign(fetched, await fetchReleaseYears(missing.slice(i, i + 100)));
+    } catch (err) {
+      console.warn("Release years failed:", err);
+    }
+  }
+  if (Object.keys(fetched).length) {
+    // Serialized, so parallel lookups don't overwrite each other's years.
+    releaseYearsWrite = releaseYearsWrite.then(async () => {
+      const { steamReleaseYears: latest = {} } =
+        await browser.storage.local.get("steamReleaseYears");
+      await browser.storage.local.set({
+        steamReleaseYears: { ...latest, ...fetched },
+      });
+    });
+    await releaseYearsWrite;
+  }
+  const all = { ...steamReleaseYears, ...fetched };
+  return Object.fromEntries(
+    appids.filter((id) => id in all).map((id) => [id, all[id]]),
+  );
 }
 
 // ---------- Currency conversion (ECB rates via frankfurter.dev) ----------
@@ -600,4 +691,6 @@ browser.runtime.onMessage.addListener((message) => {
   if (message.action === "steam_session") return getStoreSteamId();
   if (message.action === "steam_price")
     return lookupSteamPriceIn(message.title, message.gogCurrency, message.appid);
+  if (message.action === "release_years")
+    return getReleaseYears(message.appids || []);
 });

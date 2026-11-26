@@ -4,6 +4,14 @@ All notable changes to Library Matcher for Steam & GOG, newest first.
 `npm run bump` adds a heading for the new version; write that version's
 changes under it.
 
+## [0.4.1] - 2026-11-27
+
+### Fixed
+- GOG titles with a year, like "DOOM (2016)", now match the Steam game of the
+  same name ("DOOM") for the Owned and wishlist badges, Steam prices and the
+  Steam wishlist page. The year has to agree with the game's release year on
+  Steam, so "DOOM (1993)" isn't mistaken for the 2016 game.
+
 ## [0.4.0] - 2026-11-26
 
 ### Added

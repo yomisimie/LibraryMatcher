@@ -4,6 +4,10 @@
 let ownedMap = null;
 let ownedDlc = new Map(); // exact normalized title -> appid
 let wishlistMap = null;
+// Steam release years by appid (see background.js), for year-qualified GOG
+// titles; appids already asked for on this page, so each is fetched once.
+let releaseYears = {};
+const requestedYears = new Set();
 let showPrices = true;
 // Games the user chose to hide: { normalizedTitle: displayTitle }.
 let ignored = {};
@@ -56,11 +60,45 @@ function buildLookup(data) {
 
 // Returns { appid, exact } for a match (appid null for old-format lists;
 // exact false when only the edition-stripped title matched), or null.
-function lookup(map, full) {
+function lookup(map, full, raw) {
   if (map.has(full)) return { appid: map.get(full), exact: true };
   const base = "base:" + baseTitle(full);
   if (map.has(base)) return { appid: map.get(base), exact: false };
-  return null;
+  return raw ? lookupUndated(map, raw) : null;
+}
+
+// GOG's "DOOM (2016)" is plain "DOOM" on Steam, but so could another game of
+// that name be (Steam's "DOOM" is not GOG's "DOOM (1993)"), so the title
+// without the year only counts when the Steam release year agrees. Unknown
+// years are fetched in the background; storing them re-marks the page.
+function lookupUndated(map, raw) {
+  const { title, year } = splitYear(raw);
+  if (!year) return null;
+  const match = lookup(map, normalizeTitle(title));
+  if (!match?.appid) return null; // old-format lists: no appid to check
+  if (!(match.appid in releaseYears)) {
+    requestReleaseYear(match.appid);
+    return null;
+  }
+  return sameYear(releaseYears[match.appid], year) ? match : null;
+}
+
+let yearRequestTimer = null;
+const pendingYears = new Set();
+
+function requestReleaseYear(appid) {
+  if (requestedYears.has(appid)) return;
+  requestedYears.add(appid);
+  pendingYears.add(appid);
+  // One request for all the tiles of a page.
+  clearTimeout(yearRequestTimer);
+  yearRequestTimer = setTimeout(() => {
+    const appids = [...pendingYears];
+    pendingYears.clear();
+    browser.runtime
+      .sendMessage({ action: "release_years", appids })
+      .catch(() => {});
+  }, 100);
 }
 
 async function loadLists() {
@@ -74,7 +112,9 @@ async function loadLists() {
     "dimIgnoredGames",
     "gogCurrency",
     "gogCurrencyDetected",
+    "steamReleaseYears",
   ]);
+  releaseYears = data.steamReleaseYears || {};
   gogCurrencySetting = data.gogCurrency || "";
   gogCurrencySeen = data.gogCurrencyDetected || "";
   ownedMap = buildLookup(data.steamOwned || data.steamOwnedNames);
@@ -585,7 +625,7 @@ async function markOwnedGames() {
       }
     };
 
-    const ownedGame = lookup(ownedMap, gogTitle);
+    const ownedGame = lookup(ownedMap, gogTitle, rawTitle);
     const owned =
       ownedGame ||
       (ownedDlc.has(gogTitle) && { appid: ownedDlc.get(gogTitle), dlc: true });
@@ -605,7 +645,7 @@ async function markOwnedGames() {
 
     // Steam prices are only shown for wishlisted games: on the Steam wishlist
     // (known appid) or on the GOG wishlist (found on Steam by title).
-    const wish = lookup(wishlistMap, gogTitle);
+    const wish = lookup(wishlistMap, gogTitle, rawTitle);
     const gogWishlisted = !!tile.querySelector(GOG_WISHLIST_SELECTOR);
     if (!wish && !gogWishlisted) return;
 
@@ -660,6 +700,7 @@ const WATCHED_KEYS = [
   "steamCountry",
   "dimIgnoredGames",
   "gogCurrency",
+  "steamReleaseYears",
 ];
 browser.storage.onChanged.addListener((changes, area) => {
   // Ignore-list changes arrive via sync, including from other devices.

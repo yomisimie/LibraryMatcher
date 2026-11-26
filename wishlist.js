@@ -84,7 +84,9 @@ function toGogHit(p, exact, possible = false) {
 
 // Same matching rules as the store badges: exact normalized title first,
 // then the edition-stripped base title (preferring games over packs).
-function pickMatch(products, steamName) {
+// getYear resolves to the Steam game's release year; it's only asked for
+// when GOG has the title with a year, e.g. "DOOM (2016)" for Steam's "DOOM".
+async function pickMatch(products, steamName, getYear) {
   const want = normalizeTitle(steamName);
   const wantBase = baseTitle(want);
   const exact = products.find((p) => normalizeTitle(p.title) === want);
@@ -93,6 +95,16 @@ function pickMatch(products, steamName) {
   const rank = (a, b) =>
     (a.productType === "game" ? 0 : 1) - (b.productType === "game" ? 0 : 1) ||
     a.title.length - b.title.length;
+
+  const dated = products.filter((p) => {
+    const { title, year } = splitYear(p.title);
+    return year && normalizeTitle(title) === want;
+  });
+  if (dated.length) {
+    const steamYear = await getYear();
+    const same = dated.find((p) => sameYear(splitYear(p.title).year, steamYear));
+    if (same) return toGogHit(same, true);
+  }
 
   const loose = products
     .filter((p) => baseTitle(normalizeTitle(p.title)) === wantBase)
@@ -105,7 +117,7 @@ function pickMatch(products, steamName) {
   return prefixed[0] ? toGogHit(prefixed[0], false, true) : null;
 }
 
-async function findOnGog(steamName) {
+async function findOnGog(steamName, appid) {
   const key = `${gogUser.country}|${gogUser.currency}|${normalizeTitle(steamName)}`;
   const cached = searchCache[key];
   if (cached && Date.now() - cached.ts < GOG_SEARCH_TTL_MS) return cached.hit;
@@ -115,9 +127,16 @@ async function findOnGog(steamName) {
   const base = baseTitle(normalizeTitle(steamName));
   if (base !== normalizeTitle(steamName)) terms.push(base);
 
+  let yearRequest = null;
+  const getYear = () =>
+    (yearRequest ||= browser.runtime
+      .sendMessage({ action: "release_years", appids: [appid] })
+      .then((years) => years?.[appid] || null)
+      .catch(() => null));
+
   let best = null;
   for (const term of terms) {
-    const hit = pickMatch(await catalogSearch(term), steamName);
+    const hit = await pickMatch(await catalogSearch(term), steamName, getYear);
     if (hit?.exact) {
       best = hit;
       break;
@@ -397,7 +416,7 @@ async function processRow(row) {
   row.state = "searching";
   renderRow(row);
   try {
-    row.gog = await findOnGog(row.name);
+    row.gog = await findOnGog(row.name, row.appid);
     row.state = row.gog ? "found" : "notfound";
   } catch (err) {
     console.warn("GOG search failed for", row.name, err);
