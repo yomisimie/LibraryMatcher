@@ -6,7 +6,9 @@ compares prices, and lets you hide games you're not interested in.
 
 ## Features
 
-- **Owned on Steam:** the GOG tile is dimmed and gets an "Owned" badge.
+- **Owned on Steam:** the GOG tile is dimmed and gets an "Owned" badge, or
+  "Owned DLC" for DLC you own on Steam (when synced through your Steam
+  sign-in; the API key can't list DLC).
 - **On your Steam wishlist:** the tile is outlined and gets a "Wishlist" badge.
 - **Price comparison:** for games on your Steam or GOG wishlist, the Steam
   price is shown on the tile (converted to GOG's currency at the daily ECB
@@ -21,26 +23,36 @@ compares prices, and lets you hide games you're not interested in.
 
 ## Setup
 
-After installing, the settings page opens. It needs two things:
+No API key or password needed:
 
-1. **Your SteamID64:** a 17-digit number. It's shown as "Steam ID" on your
-   [Steam account page](https://store.steampowered.com/account/). If your
-   profile link looks like `steamcommunity.com/profiles/7656…`, that number
-   is it.
-2. **A Steam Web API key:** get one at
-   [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey).
-   For "Domain Name" enter anything, e.g. `localhost`. Steam only issues keys
-   to accounts that have spent at least $5.
+1. Sign in to the [Steam store](https://store.steampowered.com/login/) in
+   Firefox, if you aren't already.
+2. After installing, the settings page opens. Click **Save & Sync**.
 
-Click **Save & Sync Library**, then browse [gog.com](https://www.gog.com).
-The toolbar button resyncs your library or wishlist at any time.
+The extension reads your library and wishlist the same way the Steam store
+does to show "In Library" on its pages, and finds your SteamID from the same
+session. Then browse [gog.com](https://www.gog.com). The toolbar button
+resyncs at any time, and if your Steam sign-in expires the extension keeps
+your last synced lists until you sign in again.
+
+**Advanced: API key instead of signing in.** If you'd rather not stay signed
+in to Steam in Firefox, open *Advanced* in the settings and enter your
+SteamID64 (shown as "Steam ID" on your
+[account page](https://store.steampowered.com/account/)) and a Steam Web API
+key from [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey)
+(for "Domain Name" enter anything, e.g. `localhost`). Steam only issues keys
+to accounts that have spent at least $5, and your profile's game details must
+be public.
 
 ## Privacy
 
 There is no server of ours; nothing is sent to the developer.
 
-- Your Steam ID and API key are stored in your browser and sent only to
-  Steam's API (`api.steampowered.com`) to read your library and wishlist.
+- Your library, wishlist and SteamID are read from Steam
+  (`store.steampowered.com`, `api.steampowered.com`) using your existing
+  Steam store sign-in in Firefox. The extension never sees your password.
+- If you use an API key instead, it's stored in your browser and sent only to
+  Steam's API (`api.steampowered.com`).
 - Titles of games on GOG pages are sent to Steam's store search
   (`store.steampowered.com`) to find their Steam prices.
 - Currency codes are sent to `api.frankfurter.dev` for exchange rates.

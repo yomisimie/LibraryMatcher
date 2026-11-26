@@ -94,6 +94,21 @@
         padding: 1px 4px;
         border-radius: 3px;
       }
+      .session {
+        margin: 16px 0;
+        padding: 10px 12px;
+        background: #2a2a2a;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      details {
+        margin-top: 16px;
+      }
+      summary {
+        cursor: pointer;
+        color: #999;
+        font-size: 13px;
+      }
       .status {
         margin-top: 15px;
         font-size: 13px;
@@ -105,28 +120,44 @@
   <body>
     <h2>Library Matcher setup</h2>
     <p>
-      Enter your Steam ID and a Steam Web API key to sync your Steam library
-      and wishlist. Both stay in your browser and are only sent to Steam.
+      Sign in to the Steam store in this Firefox, then click
+      <strong>Save &amp; Sync</strong>. No API key or password needed: your
+      library and wishlist are read the same way the Steam store reads them
+      to show "In Library" on its pages. Nothing leaves your browser except
+      requests to Steam.
     </p>
 
-    <label for="steamId">SteamID64 (17 digits):</label>
-    <input type="text" id="steamId" placeholder="e.g., 76561198000000000" />
-    <p class="hint">
-      Find it on your
-      <a href="https://store.steampowered.com/account/" target="_blank" rel="noopener">Steam account page</a>
-      ("Steam ID" under your account name, sign-in needed). If your profile
-      link looks like <code>steamcommunity.com/profiles/7656…</code>, that
-      number is it.
-    </p>
+    <div id="steamSession" class="session">Checking Steam sign-in…</div>
 
-    <label for="apiKey">Steam Web API Key:</label>
-    <input type="password" id="apiKey" placeholder="Paste API key here" />
-    <p class="hint">
-      Get one at
-      <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">steamcommunity.com/dev/apikey</a>.
-      For "Domain Name" enter anything, e.g. <code>localhost</code>.
-      Steam only issues keys to accounts that have spent at least $5.
-    </p>
+    <details id="advanced">
+      <summary>Advanced: use a Steam Web API key instead</summary>
+      <p class="hint">
+        Only needed if you'd rather not stay signed in to Steam in Firefox.
+        The key stays in this browser and is only sent to
+        <code>api.steampowered.com</code>. You can revoke it at any time on
+        the same page you get it from.
+      </p>
+
+      <label for="steamId">SteamID64 (17 digits):</label>
+      <input type="text" id="steamId" placeholder="e.g., 76561198000000000" />
+      <p class="hint">
+        Filled in automatically when you're signed in. Otherwise find it on
+        your
+        <a href="https://store.steampowered.com/account/" target="_blank" rel="noopener">Steam account page</a>
+        ("Steam ID" under your account name). If your profile link looks like
+        <code>steamcommunity.com/profiles/7656…</code>, that number is it.
+      </p>
+
+      <label for="apiKey">Steam Web API Key:</label>
+      <input type="password" id="apiKey" placeholder="Paste API key here" />
+      <p class="hint">
+        Get one at
+        <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">steamcommunity.com/dev/apikey</a>.
+        For "Domain Name" enter anything, e.g. <code>localhost</code>. Steam
+        only issues keys to accounts that have spent at least $5, and your
+        profile's game details must be public.
+      </p>
+    </details>
 
     <h3>Price comparison</h3>
     <label class="checkbox">
@@ -163,7 +194,7 @@
       last currency the extension saw on a GOG store page.
     </p>
 
-    <button id="saveBtn">Save & Sync Library</button>
+    <button id="saveBtn">Save &amp; Sync</button>
     <div id="status" class="status"></div>
 
     <h3>Ignored games</h3>

@@ -1,6 +1,10 @@
 // Storage layout (browser.storage.local):
-//   steamId, apiKey                    credentials from the options page
+//   steamId, apiKey                    apiKey optional; without one, steamId
+//                                      is detected from the Steam store
+//                                      session (see getCredentials)
 //   steamOwned, steamWishlist          { normalizedTitle: appid }
+//   steamOwnedDlc                      same, owned DLC (only known without an
+//                                      API key: GetOwnedGames has no DLC)
 //   steamWishlistItems                 [{ appid, name }] in wishlist order
 //   steamOwnedSyncedAt, steamWishlistSyncedAt   ms timestamps of last success
 //   lastSyncError                      message from the last failed auto sync
@@ -19,17 +23,58 @@ const SYNC_ALARM = "auto-sync";
 const SYNC_CHECK_MINUTES = 60; // how often the alarm fires
 const SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000; // resync lists older than this
 
+const NOT_SIGNED_IN =
+  "Not signed in to the Steam store in Firefox. Sign in at store.steampowered.com, then sync again.";
+
+// SteamID of the account signed in to the Steam store in this Firefox
+// profile, or null. Our host permission makes the request carry the store's
+// cookies. Every store page embeds data-userinfo for Steam's own scripts,
+// with the SteamID when signed in; /about/ is one of the lightest. (The
+// store's webapi_token would also give the SteamID, but we'd rather not
+// touch an account token just for that.)
+async function getStoreSteamId() {
+  try {
+    const res = await fetch("https://store.steampowered.com/about/", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+    const raw = doc.querySelector("[data-userinfo]")?.dataset.userinfo;
+    const steamid = raw ? JSON.parse(raw).steamid : null;
+    return /^\d{17}$/.test(steamid || "") ? steamid : null;
+  } catch {
+    return null;
+  }
+}
+
+// With an API key the SteamID comes from Settings. Without one it comes from
+// the Steam store session (and is saved, so the popup and auto sync know
+// setup is done); a saved SteamID still covers a public wishlist when the
+// session is gone.
 async function getCredentials() {
   const { steamId, apiKey } = await browser.storage.local.get([
     "steamId",
     "apiKey",
   ]);
-  if (!steamId || !apiKey)
-    throw new Error("Missing SteamID or API key. Open Settings.");
-  return { steamId, apiKey };
+  if (apiKey) {
+    if (!steamId)
+      throw new Error("An API key needs your SteamID64 too. Open Settings.");
+    return { steamId, apiKey };
+  }
+  const detected = await getStoreSteamId();
+  if (detected) {
+    if (detected !== steamId)
+      await browser.storage.local.set({ steamId: detected });
+    return { steamId: detected, apiKey: "" };
+  }
+  if (steamId) return { steamId, apiKey: "" };
+  throw new Error(NOT_SIGNED_IN);
 }
 
 function describeHttpError(status) {
+  // Keyless calls answer 400 for a malformed SteamID.
+  if (status === 400) return "Steam didn't accept the SteamID. Check Settings.";
   if (status === 401 || status === 403)
     return "Steam rejected the API key or SteamID. Check Settings.";
   if (status === 429) return "Steam rate limit hit. Try again in a minute.";
@@ -41,10 +86,43 @@ function addApp(map, name, appid) {
   if (key) map[key] = appid;
 }
 
-async function syncSteamLibrary() {
-  const { steamId, apiKey } = await getCredentials();
-  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId}&include_appinfo=true&include_played_free_games=true&format=json`;
+// Steam's EAppType values we care about.
+const APP_GAME = 1;
+const APP_SOFTWARE = 2;
+const APP_DLC = 32;
 
+// Resolves app IDs to { name, type }, 100 per request (GetApps works without
+// a key). A few batches at a time, since a big library is thousands of apps.
+// Any failed batch rejects, so a partial list never overwrites the saved one.
+async function fetchApps(appIds, apiKey) {
+  const chunkSize = 100;
+  const chunks = [];
+  for (let i = 0; i < appIds.length; i += chunkSize)
+    chunks.push(appIds.slice(i, i + chunkSize));
+
+  const apps = {}; // appid -> { name, type }
+  const fetchChunk = async (ids) => {
+    const params = new URLSearchParams();
+    if (apiKey) params.set("key", apiKey);
+    ids.forEach((id, index) => params.append(`appids[${index}]`, id));
+    const res = await fetch(
+      `https://api.steampowered.com/ICommunityService/GetApps/v1/?${params}`,
+    );
+    if (!res.ok) throw new Error(describeHttpError(res.status));
+    const data = await res.json();
+    (data.response?.apps || []).forEach((app) => {
+      if (app.name) apps[app.appid] = { name: app.name, type: app.app_type };
+    });
+  };
+  const worker = async () => {
+    while (chunks.length) await fetchChunk(chunks.shift());
+  };
+  await Promise.all(Array.from({ length: 4 }, worker));
+  return apps;
+}
+
+async function fetchOwnedWithKey(steamId, apiKey) {
+  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId}&include_appinfo=true&include_played_free_games=true&format=json`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(describeHttpError(response.status));
 
@@ -53,59 +131,86 @@ async function syncSteamLibrary() {
     throw new Error(
       "No games returned. Is your game details privacy set to public?",
     );
+  // GetOwnedGames has no DLC.
+  return { games: data.response.games, dlc: [] };
+}
+
+// Without a key, GetOwnedGames answers 401 and Steam's community games page
+// redirects anonymous visitors to sign-in, even for public profiles. The
+// store's userdata endpoint lists owned apps for whoever is signed in to the
+// Steam store in this Firefox profile (the host permission sends its cookies).
+async function fetchOwnedWithoutKey() {
+  const response = await fetch(
+    "https://store.steampowered.com/dynamicstore/userdata/",
+    { credentials: "include", cache: "no-store" },
+  );
+  if (!response.ok) throw new Error(describeHttpError(response.status));
+  const data = await response.json();
+  const appIds = data.rgOwnedApps || [];
+  // Signed out, Steam still answers 200, just with empty lists.
+  if (!appIds.length) throw new Error(NOT_SIGNED_IN);
+  // rgOwnedApps is every app in the user's licenses, including soundtracks,
+  // tools and demos. Games and software match what GetOwnedGames returns;
+  // DLC is kept apart so GOG's DLC tiles can be marked too.
+  const apps = await fetchApps(appIds, "");
+  const games = [];
+  const dlc = [];
+  for (const appid of appIds) {
+    const app = apps[appid];
+    if (!app) continue;
+    if (app.type === APP_GAME || app.type === APP_SOFTWARE)
+      games.push({ appid, name: app.name });
+    else if (app.type === APP_DLC) dlc.push({ appid, name: app.name });
+  }
+  return { games, dlc };
+}
+
+// Resolves to { games, dlc } counts.
+async function syncSteamLibrary() {
+  const { steamId, apiKey } = await getCredentials();
+  const { games, dlc } = apiKey
+    ? await fetchOwnedWithKey(steamId, apiKey)
+    : await fetchOwnedWithoutKey();
 
   const owned = {};
-  data.response.games.forEach((game) => addApp(owned, game.name, game.appid));
+  games.forEach((game) => addApp(owned, game.name, game.appid));
+  const ownedDlc = {};
+  dlc.forEach((d) => addApp(ownedDlc, d.name, d.appid));
 
   await browser.storage.local.set({
     steamOwned: owned,
+    steamOwnedDlc: ownedDlc,
     steamOwnedSyncedAt: Date.now(),
   });
   await browser.storage.local.remove("steamOwnedNames");
-  return Object.keys(owned).length;
+  return {
+    games: Object.keys(owned).length,
+    dlc: Object.keys(ownedDlc).length,
+  };
 }
 
 async function syncWishlist() {
   const { steamId, apiKey } = await getCredentials();
 
-  // 1. Fetch the wishlist's app IDs
-  const wishlistUrl = `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${steamId}&key=${apiKey}`;
-  const wishlistResponse = await fetch(wishlistUrl);
+  // 1. Fetch the wishlist's app IDs. A public wishlist needs no key.
+  const params = new URLSearchParams({ steamid: steamId });
+  if (apiKey) params.set("key", apiKey);
+  const wishlistResponse = await fetch(
+    `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?${params}`,
+  );
   if (!wishlistResponse.ok)
     throw new Error(describeHttpError(wishlistResponse.status));
 
   const wishlistData = await wishlistResponse.json();
   const appIds = (wishlistData.response?.items || []).map((i) => i.appid);
 
-  // 2. Resolve names in batches of 100. Any failed batch rejects the whole
-  // sync, so a partial list never overwrites the previously saved one.
+  // 2. Resolve names (original Steam titles, also shown on the wishlist page).
+  const apps = await fetchApps(appIds, apiKey);
+  const names = Object.fromEntries(
+    Object.entries(apps).map(([appid, app]) => [appid, app.name]),
+  );
   const wishlist = {};
-  const names = {}; // appid -> original Steam title, for the wishlist page
-  const chunkSize = 100;
-  const batches = [];
-  for (let i = 0; i < appIds.length; i += chunkSize) {
-    const params = new URLSearchParams({ key: apiKey });
-    appIds
-      .slice(i, i + chunkSize)
-      .forEach((id, index) => params.append(`appids[${index}]`, id));
-
-    batches.push(
-      fetch(
-        `https://api.steampowered.com/ICommunityService/GetApps/v1/?${params}`,
-      )
-        .then((res) => {
-          if (!res.ok) throw new Error(describeHttpError(res.status));
-          return res.json();
-        })
-        .then((appsData) => {
-          (appsData.response?.apps || []).forEach((app) => {
-            addApp(wishlist, app.name, app.appid);
-            if (app.name) names[app.appid] = app.name;
-          });
-        }),
-    );
-  }
-  await Promise.all(batches);
+  appIds.forEach((appid) => addApp(wishlist, names[appid], appid));
 
   // Wishlist order (Steam returns it by priority) with display names.
   const items = appIds
@@ -132,7 +237,7 @@ async function autoSyncIfStale() {
     "steamOwnedSyncedAt",
     "steamWishlistSyncedAt",
   ]);
-  if (!data.steamId || !data.apiKey) return;
+  if (!data.steamId) return;
 
   const now = Date.now();
   const errors = [];
@@ -492,6 +597,7 @@ function respond(promise) {
 browser.runtime.onMessage.addListener((message) => {
   if (message.action === "force_sync") return respond(syncSteamLibrary());
   if (message.action === "sync_wishlist") return respond(syncWishlist());
+  if (message.action === "steam_session") return getStoreSteamId();
   if (message.action === "steam_price")
     return lookupSteamPriceIn(message.title, message.gogCurrency, message.appid);
 });

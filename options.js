@@ -9,7 +9,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     "gogCurrencyDetected",
   ]);
   if (data.steamId) document.getElementById("steamId").value = data.steamId;
-  if (data.apiKey) document.getElementById("apiKey").value = data.apiKey;
+  if (data.apiKey) {
+    document.getElementById("apiKey").value = data.apiKey;
+    document.getElementById("advanced").open = true;
+  }
   document.getElementById("showSteamPrices").checked =
     data.showSteamPrices !== false;
   document.getElementById("steamCountry").value = data.steamCountry || "";
@@ -18,7 +21,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     ? `Auto (last seen: ${data.gogCurrencyDetected})`
     : "Auto (not seen yet: open a GOG store page)";
   renderIgnored();
+  renderSession();
 });
+
+// ---------- Steam sign-in status ----------
+
+const STEAM_LOGIN = "https://store.steampowered.com/login/";
+
+async function renderSession() {
+  const el = document.getElementById("steamSession");
+  // Without host permissions every Steam request fails, which would look
+  // like being signed out. Save & Sync asks for them.
+  const origins = browser.runtime.getManifest().host_permissions;
+  if (!(await browser.permissions.contains({ origins }))) {
+    el.textContent =
+      "Click Save & Sync and allow access to Steam when Firefox asks.";
+    return;
+  }
+  const steamId = await browser.runtime
+    .sendMessage({ action: "steam_session" })
+    .catch(() => null);
+  el.replaceChildren();
+  if (steamId) {
+    el.append(`✓ Signed in to Steam (SteamID ${steamId}).`);
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = STEAM_LOGIN;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "Sign in to the Steam store";
+  el.append("Not signed in to Steam. ", link, ", then come back here.");
+}
+
+// Coming back from the sign-in tab.
+window.addEventListener("focus", renderSession);
 
 // ---------- Ignored games (saved immediately, independent of Save & Sync) ----------
 
@@ -58,6 +95,12 @@ browser.storage.onChanged.addListener((changes, area) => {
     renderIgnored();
 });
 
+// "2,500 games, 600 DLC"; DLC is only known when synced without an API key.
+function libraryText({ games, dlc }) {
+  const text = `${games.toLocaleString()} games`;
+  return dlc ? `${text}, ${dlc.toLocaleString()} DLC` : text;
+}
+
 // Save credentials and request background script to sync
 document.getElementById("saveBtn").addEventListener("click", async () => {
   const steamId = document.getElementById("steamId").value.trim();
@@ -71,9 +114,9 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     .toUpperCase();
   const gogCurrency = document.getElementById("gogCurrency").value;
 
-  if (!steamId || !apiKey) {
+  if (apiKey && !steamId) {
     status.style.color = "#ff8888";
-    status.textContent = "Please fill out both fields.";
+    status.textContent = "With an API key, enter your SteamID64 too.";
     return;
   }
   if (steamCountry && !/^[A-Z]{2}$/.test(steamCountry)) {
@@ -121,7 +164,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     // 3. Handle the UI status updates using both results
     if (ownedResponse?.success && wishlistResponse?.success) {
       status.style.color = "#a3ffb4";
-      status.textContent = `Synced ${ownedResponse.count} games and ${wishlistResponse.count} wishlist items!`;
+      status.textContent = `Synced ${libraryText(ownedResponse.count)} and ${wishlistResponse.count} wishlist items!`;
     } else if (ownedResponse?.success) {
       status.style.color = "#ffcc66";
       status.textContent = `Library synced, but Wishlist failed: ${wishlistResponse?.message || "unknown error"}`;
@@ -129,6 +172,10 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       status.style.color = "#ff8888";
       status.textContent = `Sync failed: ${ownedResponse?.message || "unknown error"}`;
     }
+    // Without a key the sync detects the SteamID from the Steam session.
+    const { steamId: saved } = await browser.storage.local.get("steamId");
+    document.getElementById("steamId").value = saved || "";
+    renderSession();
   } catch (err) {
     console.error("Combined synchronization routine crashed:", err);
     status.textContent = "Connection error during batch processing.";

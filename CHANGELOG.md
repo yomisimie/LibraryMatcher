@@ -4,6 +4,25 @@ All notable changes to Library Matcher for Steam & GOG, newest first.
 `npm run bump` adds a heading for the new version; write that version's
 changes under it.
 
+## [0.4.0] - 2026-11-26
+
+### Added
+- No Steam API key needed anymore: sign in to the Steam store in Firefox and
+  click Save & Sync. Your library, wishlist and SteamID are read from that
+  sign-in, the same way the Steam store shows "In Library" on its pages.
+- The settings page shows whether you're signed in to Steam, with a link to
+  sign in.
+- DLC you own on Steam is synced too and marked "Owned DLC" on GOG (when
+  syncing through your Steam sign-in; the API key can't list DLC). The popup
+  shows how many DLC were synced.
+
+### Changed
+- The SteamID and API key fields moved under "Advanced" in the settings.
+  An API key still works if you'd rather not stay signed in to Steam.
+- If your Steam sign-in expires, your last synced lists are kept, and the
+  error says to sign in again.
+- Clearer error when Steam doesn't accept the SteamID.
+
 ## [0.3.0] - 2026-11-26
 
 ### Added

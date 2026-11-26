@@ -24,8 +24,8 @@ function countOf(list) {
 async function renderInfo() {
   const d = await browser.storage.local.get([
     "steamId",
-    "apiKey",
     "steamOwned",
+    "steamOwnedDlc",
     "steamOwnedNames",
     "steamWishlist",
     "steamWishlistNames",
@@ -35,8 +35,8 @@ async function renderInfo() {
   ]);
 
   infoEl.replaceChildren();
-  if (!d.steamId || !d.apiKey) {
-    infoEl.textContent = "Not set up yet. Open Settings to add your Steam details.";
+  if (!d.steamId) {
+    infoEl.textContent = "Not set up yet. Sign in to the Steam store in Firefox, then open Settings and click Save & Sync.";
     return;
   }
 
@@ -48,6 +48,9 @@ async function renderInfo() {
     infoEl.appendChild(div);
   };
   line("games", countOf(d.steamOwned || d.steamOwnedNames), d.steamOwnedSyncedAt);
+  // DLC is only known when synced through the Steam sign-in, not the API key.
+  if (countOf(d.steamOwnedDlc))
+    line("DLC", countOf(d.steamOwnedDlc), d.steamOwnedSyncedAt);
   line("wishlisted", countOf(d.steamWishlist || d.steamWishlistNames), d.steamWishlistSyncedAt);
 
   if (d.lastSyncError) setStatus(`Auto sync failed: ${d.lastSyncError}`, true);
@@ -73,7 +76,8 @@ async function runSync(button, action, busyText, successText) {
 }
 
 document.getElementById("syncBtn").addEventListener("click", (e) =>
-  runSync(e.currentTarget, "force_sync", "Syncing library…", (n) => `Synced ${n} games!`),
+  runSync(e.currentTarget, "force_sync", "Syncing library…", ({ games, dlc }) =>
+    dlc ? `Synced ${games} games and ${dlc} DLC!` : `Synced ${games} games!`),
 );
 
 document.getElementById("wishlistBtn").addEventListener("click", (e) =>

@@ -26,9 +26,9 @@ a target.
 | `icon.svg` | Extension and toolbar icon. Original artwork: don't use Steam's or GOG's logos for it. |
 | `normalize.js` | Shared title matching: `normalizeTitle()` and `baseTitle()` (edition-stripped fallback). Used everywhere titles are compared. |
 | `ignore.js` | Shared ignore-list helpers over `storage.sync`: `getIgnored()`, `setIgnored()`, `ignoreListChanged()`. |
-| `background.js` | Steam Web API sync (owned games, wishlist), hourly auto sync via `alarms`, Steam store price lookup with caching/queueing, ECB exchange rates, message handlers, ignore-list migration, the right-click "Ignore" menu item (the content script resolves which game was clicked). Its header comment documents the storage layout; keep it current. |
+| `background.js` | Steam sync (owned games, wishlist; via the Steam store session by default, or the Web API with a key), hourly auto sync via `alarms`, Steam store price lookup with caching/queueing, ECB exchange rates, message handlers, ignore-list migration, the right-click "Ignore" menu item (the content script resolves which game was clicked). Its header comment documents the storage layout; keep it current. |
 | `content.js` / `content.css` | Runs on `*.gog.com`. Finds product tiles, adds badges, price cards and the ignore button. Everything it injects has class `slm-ui`; every class it adds is listed in `MARK_CLASSES`, so `clearMarks()` can fully reset a page. |
-| `options.html` / `options.js` | Setup: SteamID64 + API key, price settings, ignored-games list. |
+| `options.html` / `options.js` | Setup: Steam sign-in status (default, no key), optional SteamID64 + API key under Advanced, price settings, ignored-games list. |
 | `popup.html` / `popup.js` | Toolbar popup: sync status and manual sync buttons. |
 | `wishlist.html` / `wishlist.js` | "Steam wishlist on GOG" page (uses GOG's catalog and the user's GOG login cookies). |
 | `scripts/` | Dev tooling (Node): version bump, dist cleanup. Not shipped. |

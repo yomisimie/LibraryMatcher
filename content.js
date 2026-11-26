@@ -2,6 +2,7 @@
 // Each map holds the full normalized title and its looser "base:" form,
 // both pointing at the Steam appid (or null for lists from older versions).
 let ownedMap = null;
+let ownedDlc = new Map(); // exact normalized title -> appid
 let wishlistMap = null;
 let showPrices = true;
 // Games the user chose to hide: { normalizedTitle: displayTitle }.
@@ -65,6 +66,7 @@ function lookup(map, full) {
 async function loadLists() {
   const data = await browser.storage.local.get([
     "steamOwned",
+    "steamOwnedDlc",
     "steamWishlist",
     "steamOwnedNames",
     "steamWishlistNames",
@@ -76,6 +78,14 @@ async function loadLists() {
   gogCurrencySetting = data.gogCurrency || "";
   gogCurrencySeen = data.gogCurrencyDetected || "";
   ownedMap = buildLookup(data.steamOwned || data.steamOwnedNames);
+  // Exact titles only: the edition-stripped fallback would turn a DLC like
+  // "Foo Deluxe Edition" into "foo" and mark the base game as owned.
+  ownedDlc = new Map(
+    Object.entries(data.steamOwnedDlc || {}).map(([name, appid]) => [
+      normalizeTitle(name),
+      appid,
+    ]),
+  );
   wishlistMap = buildLookup(data.steamWishlist || data.steamWishlistNames);
   showPrices = data.showSteamPrices !== false;
   dimIgnored = data.dimIgnoredGames === true;
@@ -188,8 +198,10 @@ function createBadge(kind, text, tooltip, appid, compact = false) {
   return badge;
 }
 
-function createOwnedBadge(appid, compact) {
-  return createBadge("owned", compact ? "✓" : "Owned", "Owned on Steam", appid, compact);
+function createOwnedBadge(appid, compact, dlc) {
+  return dlc
+    ? createBadge("owned", compact ? "✓" : "Owned DLC", "DLC owned on Steam", appid, compact)
+    : createBadge("owned", compact ? "✓" : "Owned", "Owned on Steam", appid, compact);
 }
 
 function createWishlistBadge(appid, compact) {
@@ -573,7 +585,10 @@ async function markOwnedGames() {
       }
     };
 
-    const owned = lookup(ownedMap, gogTitle);
+    const ownedGame = lookup(ownedMap, gogTitle);
+    const owned =
+      ownedGame ||
+      (ownedDlc.has(gogTitle) && { appid: ownedDlc.get(gogTitle), dlc: true });
     if (owned) {
       if (tile.querySelector(".steam-owned-badge")) return;
       tile.classList.remove("slm-wishlist");
@@ -581,7 +596,7 @@ async function markOwnedGames() {
         .querySelectorAll(".steam-wishlist-badge, .slm-price-card")
         .forEach((el) => el.remove());
       tile.classList.add("slm-owned");
-      const badge = createOwnedBadge(owned.appid, compact);
+      const badge = createOwnedBadge(owned.appid, compact, owned.dlc);
       // Compact and wide rows: the CSS keeps the badge undimmed there.
       if (compact || row) placeBadge(badge);
       else tile.appendChild(badge);
@@ -637,6 +652,7 @@ window.addEventListener("load", () => {
 // Pick up fresh lists or settings after a sync without a page reload.
 const WATCHED_KEYS = [
   "steamOwned",
+  "steamOwnedDlc",
   "steamWishlist",
   "steamOwnedNames",
   "steamWishlistNames",
