@@ -4,10 +4,12 @@
 let ownedMap = null;
 let ownedDlc = new Map(); // exact normalized title -> appid
 let wishlistMap = null;
-// Steam release years by appid (see background.js), for year-qualified GOG
-// titles; appids already asked for on this page, so each is fetched once.
-let releaseYears = {};
-const requestedYears = new Set();
+// Release year and companies per Steam appid and per GOG title key, to tell
+// same-named games apart (see differentGames() in normalize.js). Loaded from
+// background.js's permanent caches; only games missing there are requested,
+// once per page.
+let steamInfo = {};
+let gogInfo = {};
 let showPrices = true;
 // Games the user chose to hide: { normalizedTitle: displayTitle }.
 let ignored = {};
@@ -70,44 +72,85 @@ function lookup(map, normalized, raw) {
 
 // GOG's "DOOM (2016)" is plain "DOOM" on Steam, but so could another game of
 // that name be (Steam's "DOOM" is not GOG's "DOOM (1993)"), so the title
-// without the year only counts when the Steam release year agrees. Unknown
-// years are fetched in the background, then the waiting tiles are marked.
+// without the year only counts when the Steam release year agrees. Until the
+// year is known the tile stays unmarked.
 function lookupUndated(map, raw) {
   const { title, year } = splitYear(raw);
   if (!year) return null;
   const match = lookup(map, normalizeTitle(title));
   if (!match?.appid) return null; // old-format lists: no appid to check
-  if (!(match.appid in releaseYears)) {
-    requestReleaseYear(match.appid);
+  if (!(match.appid in steamInfo)) {
+    requestInfo(match.appid, null);
     return null;
   }
-  return sameYear(releaseYears[match.appid], year) ? match : null;
+  return sameYear(steamInfo[match.appid]?.year, year) ? match : null;
 }
 
-let yearRequestTimer = null;
-const pendingYears = new Set();
+// Drops a title match that is another game of the same name (GOG's 1995
+// "Screamer" vs Steam's 2026 one). While details are missing the match
+// stands, as most are right; if it turns out wrong the page is re-marked.
+function confirmed(match, raw) {
+  if (!match?.appid) return match;
+  const key = titleKey(normalizeTitle(raw));
+  if (!(match.appid in steamInfo) || !(key in gogInfo)) {
+    requestInfo(match.appid, raw);
+    return match;
+  }
+  return differentGames(gogInfo[key], steamInfo[match.appid]) ? null : match;
+}
 
-function requestReleaseYear(appid) {
-  if (requestedYears.has(appid)) return;
-  requestedYears.add(appid);
-  pendingYears.add(appid);
-  // One request for all the tiles of a page.
-  clearTimeout(yearRequestTimer);
-  yearRequestTimer = setTimeout(() => {
-    const appids = [...pendingYears];
-    pendingYears.clear();
-    // Uses the reply rather than watching storage: Steam price lookups store
-    // years too, and redrawing every GOG tab for each of those made badges
-    // flicker. markOwnedGames only adds what's missing, no reset needed.
-    browser.runtime
-      .sendMessage({ action: "release_years", appids })
-      .then((years) => {
-        if (!years || !Object.keys(years).length) return;
-        Object.assign(releaseYears, years);
-        markOwnedGames();
-      })
-      .catch(() => {});
-  }, 100);
+const requested = new Set();
+const pendingAppids = new Set();
+const pendingTitles = new Set();
+let infoTimer = null;
+
+function requestInfo(appid, raw) {
+  if (appid && !(appid in steamInfo) && !requested.has("app:" + appid)) {
+    requested.add("app:" + appid);
+    pendingAppids.add(appid);
+  }
+  const key = raw && titleKey(normalizeTitle(raw));
+  if (key && !(key in gogInfo) && !requested.has("gog:" + key)) {
+    requested.add("gog:" + key);
+    pendingTitles.add(raw);
+  }
+  if (!pendingAppids.size && !pendingTitles.size) return;
+  // One round of requests for all the tiles of a page.
+  clearTimeout(infoTimer);
+  infoTimer = setTimeout(fetchPendingInfo, 100);
+}
+
+// Uses the replies rather than watching storage: Steam price lookups fill the
+// same caches, and redrawing every GOG tab for each of those made badges
+// flicker. Only a match that turned out wrong needs a reset.
+async function fetchPendingInfo() {
+  const appids = [...pendingAppids];
+  const titles = [...pendingTitles];
+  pendingAppids.clear();
+  pendingTitles.clear();
+  const [steam, gog] = await Promise.all([
+    appids.length
+      ? browser.runtime.sendMessage({ action: "steam_info", appids }).catch(() => null)
+      : null,
+    titles.length
+      ? browser.runtime.sendMessage({ action: "gog_info", titles }).catch(() => null)
+      : null,
+  ]);
+  Object.assign(steamInfo, steam || {});
+  Object.assign(gogInfo, gog || {});
+  if (!Object.keys(steam || {}).length && !Object.keys(gog || {}).length) return;
+  // Tiles marked before the details arrived: are any of them wrong now?
+  const wrong = [...document.querySelectorAll(TITLE_SELECTOR)].some((titleEl) => {
+    const tile = titleEl.closest(TILE_SELECTOR);
+    if (!tile?.matches(".slm-owned, .slm-wishlist")) return false;
+    const raw = titleEl.textContent.trim();
+    const full = normalizeTitle(raw);
+    const map = tile.classList.contains("slm-owned") ? ownedMap : wishlistMap;
+    const match = lookup(map, full, raw);
+    return match && !confirmed(match, raw);
+  });
+  if (wrong) clearMarks();
+  markOwnedGames();
 }
 
 async function loadLists() {
@@ -121,9 +164,11 @@ async function loadLists() {
     "dimIgnoredGames",
     "gogCurrency",
     "gogCurrencyDetected",
-    "steamReleaseYears",
+    "steamAppInfo",
+    "gogTitleInfo",
   ]);
-  releaseYears = data.steamReleaseYears || {};
+  steamInfo = data.steamAppInfo || {};
+  gogInfo = data.gogTitleInfo || {};
   gogCurrencySetting = data.gogCurrency || "";
   gogCurrencySeen = data.gogCurrencyDetected || "";
   ownedMap = buildLookup(data.steamOwned || data.steamOwnedNames);
@@ -634,7 +679,7 @@ async function markOwnedGames() {
       }
     };
 
-    const ownedGame = lookup(ownedMap, gogTitle, rawTitle);
+    const ownedGame = confirmed(lookup(ownedMap, gogTitle, rawTitle), rawTitle);
     const owned =
       ownedGame ||
       (ownedDlc.has(titleKey(gogTitle)) && {
@@ -657,7 +702,7 @@ async function markOwnedGames() {
 
     // Steam prices are only shown for wishlisted games: on the Steam wishlist
     // (known appid) or on the GOG wishlist (found on Steam by title).
-    const wish = lookup(wishlistMap, gogTitle, rawTitle);
+    const wish = confirmed(lookup(wishlistMap, gogTitle, rawTitle), rawTitle);
     const gogWishlisted = !!tile.querySelector(GOG_WISHLIST_SELECTOR);
     if (!wish && !gogWishlisted) return;
 

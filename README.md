@@ -55,6 +55,9 @@ There is no server of ours; nothing is sent to the developer.
   Steam's API (`api.steampowered.com`).
 - Titles of games on GOG pages are sent to Steam's store search
   (`store.steampowered.com`) to find their Steam prices.
+- To tell apart games that share a name, the titles of matched games are
+  looked up in GOG's catalog (`catalog.gog.com`), and their Steam app IDs at
+  Steam (`api.steampowered.com`), for release dates and developers.
 - Currency codes are sent to `api.frankfurter.dev` for exchange rates.
 - The "Steam wishlist on GOG" page uses your existing GOG login to read your
   GOG library and wishlist and to add games to it.

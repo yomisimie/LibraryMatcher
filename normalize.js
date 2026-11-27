@@ -69,6 +69,55 @@ function sameYear(a, b) {
   return !!a && !!b && Math.abs(a - b) <= 1;
 }
 
+// ---------- Same title, different game ----------
+
+// Company names as written differ between stores ("Milestone S.r.l." vs
+// "Milestone", "Night Dive Studios" vs "Nightdive Studios"), so compare them
+// without legal suffixes and spaces.
+const COMPANY_SUFFIX =
+  /\s+(?:inc|llc|ltd|limited|gmbh|ag|sa|srl|s r l|s a|sp z o o|co|corp|corporation|ab|oy|bv|kk|plc|pty)$/;
+
+function companyKey(name) {
+  let key = normalizeTitle(name);
+  let prev;
+  do {
+    prev = key;
+    key = key.replace(COMPANY_SUFFIX, "");
+  } while (key !== prev);
+  return key.replace(/\s+/g, "");
+}
+
+function sharesCompany(a, b) {
+  const keys = new Set(a.map(companyKey).filter(Boolean));
+  return b.map(companyKey).some((k) => k && keys.has(k));
+}
+
+// Two store entries with the same title can be different games: GOG's
+// "Screamer" is the 1995 racer, Steam's newest "Screamer" a 2026 game by
+// another studio. Each side is { year, companies } (developers and
+// publishers), or null when unknown. Release years alone can't tell: a classic
+// re-released on Steam may only carry the re-release date (Uplink: 2001 on
+// GOG, 2006 on Steam). So it's a different game only when the years are far
+// apart and no developer or publisher is shared. Unknown data keeps the match.
+function differentGames(gog, steam) {
+  if (!gog?.year || !steam?.year) return false;
+  if (sameYear(gog.year, steam.year)) return false;
+  if (!gog.companies?.length || !steam.companies?.length) return false;
+  return !sharesCompany(gog.companies, steam.companies);
+}
+
+// { year, companies } from a GOG catalog product. releaseDate is the
+// original release ("1995.10.31"); storeReleaseDate is when GOG listed it.
+function gogProductInfo(p) {
+  const year = parseInt(p.releaseDate, 10);
+  return {
+    year: year > 1900 ? year : 0,
+    companies: [...(p.developers || []), ...(p.publishers || [])],
+  };
+}
+
+globalThis.differentGames = differentGames;
+globalThis.gogProductInfo = gogProductInfo;
 globalThis.normalizeTitle = normalizeTitle;
 globalThis.baseTitle = baseTitle;
 globalThis.titleKey = titleKey;

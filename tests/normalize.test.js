@@ -90,6 +90,52 @@ test("sameYear allows one year either way, and needs both years", () => {
   assert.ok(!sameYear(2016, null));
 });
 
+test("differentGames tells same-named games apart", () => {
+  // GOG's 1995 Screamer vs Steam's 2026 one by another studio.
+  const gogScreamer = { year: 1995, companies: ["Graffiti", "Virgin Interactive"] };
+  assert.ok(differentGames(gogScreamer, { year: 2026, companies: ["Milestone S.r.l."] }));
+  // Steam's re-release of the same game, with its original date.
+  assert.ok(!differentGames(gogScreamer, { year: 1995, companies: ["Graffiti"] }));
+  // A classic with only its Steam re-release date: same developer keeps it.
+  assert.ok(
+    !differentGames(
+      { year: 2001, companies: ["Introversion Software"] },
+      { year: 2006, companies: ["Introversion Software"] },
+    ),
+  );
+  // Company names written differently.
+  assert.ok(
+    !differentGames(
+      { year: 1994, companies: ["Night Dive Studios"] },
+      { year: 2016, companies: ["Nightdive Studios, Inc."] },
+    ),
+  );
+  assert.ok(
+    !differentGames(
+      { year: 2010, companies: ["Milestone"] },
+      { year: 2020, companies: ["Milestone S.r.l."] },
+    ),
+  );
+  // Missing details keep the match.
+  assert.ok(!differentGames(null, { year: 2026, companies: ["Milestone"] }));
+  assert.ok(!differentGames(gogScreamer, undefined));
+  assert.ok(!differentGames(gogScreamer, { year: 0, companies: ["Milestone"] }));
+  assert.ok(!differentGames(gogScreamer, { year: 2026, companies: [] }));
+});
+
+test("gogProductInfo reads GOG's original release year", () => {
+  assert.deepEqual(
+    gogProductInfo({
+      releaseDate: "1995.10.31",
+      storeReleaseDate: "2009.02.13",
+      developers: ["Graffiti"],
+      publishers: ["Virgin"],
+    }),
+    { year: 1995, companies: ["Graffiti", "Virgin"] },
+  );
+  assert.deepEqual(gogProductInfo({}), { year: 0, companies: [] });
+});
+
 test("a dated GOG title matches the undated Steam title only by year", () => {
   // Steam's "DOOM" is the 2016 game.
   const steam = { name: "DOOM", year: 2016 };

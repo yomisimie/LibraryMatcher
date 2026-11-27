@@ -14,6 +14,9 @@ let gogUser = { loggedIn: false, country: "US", currency: "USD", owned: new Set(
 let rows = [];
 let filter = "all";
 let searchCache = {};
+// Steam release year and companies per appid, fetched for the whole
+// wishlist up front (background.js caches them for good).
+let steamInfo = {};
 let cacheDirty = false;
 
 // ---------- GOG API ----------
@@ -84,13 +87,15 @@ function toGogHit(p, exact, possible = false) {
 
 // Same matching rules as the store badges: exact normalized title first,
 // then the edition-stripped base title (preferring games over packs).
-// getYear resolves to the Steam game's release year; it's only asked for
-// when GOG has the title with a year, e.g. "DOOM (2016)" for Steam's "DOOM".
-async function pickMatch(products, steamName, getYear) {
+// steam is the Steam game's { year, companies } (or undefined): it rules out
+// a GOG game that only shares the name (Steam's 2026 "Screamer" isn't GOG's
+// 1995 one), and picks "DOOM (2016)" on GOG for Steam's "DOOM".
+function pickMatch(products, steamName, steam) {
   // Compared as titleKey, so "DOOM II" matches "Doom 2".
   const key = (name) => titleKey(normalizeTitle(name));
   const want = key(steamName);
   const wantBase = baseTitle(want);
+  products = products.filter((p) => !differentGames(gogProductInfo(p), steam));
   const exact = products.find((p) => key(p.title) === want);
   if (exact) return toGogHit(exact, true);
   // Prefer games over packs, then the shortest (least extra) title.
@@ -102,11 +107,8 @@ async function pickMatch(products, steamName, getYear) {
     const { title, year } = splitYear(p.title);
     return year && key(title) === want;
   });
-  if (dated.length) {
-    const steamYear = await getYear();
-    const same = dated.find((p) => sameYear(splitYear(p.title).year, steamYear));
-    if (same) return toGogHit(same, true);
-  }
+  const same = dated.find((p) => sameYear(splitYear(p.title).year, steam?.year));
+  if (same) return toGogHit(same, true);
 
   const loose = products
     .filter((p) => baseTitle(key(p.title)) === wantBase)
@@ -129,16 +131,9 @@ async function findOnGog(steamName, appid) {
   const base = baseTitle(normalizeTitle(steamName));
   if (base !== normalizeTitle(steamName)) terms.push(base);
 
-  let yearRequest = null;
-  const getYear = () =>
-    (yearRequest ||= browser.runtime
-      .sendMessage({ action: "release_years", appids: [appid] })
-      .then((years) => years?.[appid] || null)
-      .catch(() => null));
-
   let best = null;
   for (const term of terms) {
-    const hit = await pickMatch(await catalogSearch(term), steamName, getYear);
+    const hit = pickMatch(await catalogSearch(term), steamName, steamInfo[appid]);
     if (hit?.exact) {
       best = hit;
       break;
@@ -457,6 +452,12 @@ async function main() {
   progressEl.textContent = "Checking your GOG account…";
   await loadGogUser();
   document.getElementById("loginBanner").hidden = gogUser.loggedIn;
+
+  progressEl.textContent = "Checking release dates on Steam…";
+  steamInfo =
+    (await browser.runtime
+      .sendMessage({ action: "steam_info", appids: items.map((i) => i.appid) })
+      .catch(() => null)) || {};
 
   rows = items.map((item) => ({ ...item, state: "queued" }));
   rows.forEach((row) => rowsEl.appendChild(renderRow(row)));

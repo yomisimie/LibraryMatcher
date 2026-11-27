@@ -181,3 +181,17 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     status.textContent = "Connection error during batch processing.";
   }
 });
+
+// Cached lookups only; the synced lists, settings and ignore list stay.
+// Done by background.js, which also holds the price cache in memory.
+document.getElementById("clearCacheBtn").addEventListener("click", async () => {
+  const status = document.getElementById("cacheStatus");
+  try {
+    await browser.runtime.sendMessage({ action: "clear_cache" });
+    status.style.color = "#a3ffb4";
+    status.textContent = "Cleared. Reload open GOG tabs to look games up again.";
+  } catch (err) {
+    status.style.color = "#ff8888";
+    status.textContent = `Couldn't clear: ${err.message}`;
+  }
+});

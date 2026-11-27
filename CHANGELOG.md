@@ -4,6 +4,21 @@ All notable changes to Library Matcher for Steam & GOG, newest first.
 `npm run bump` adds a heading for the new version; write that version's
 changes under it.
 
+## [0.5.0] - 2026-11-27
+
+### Added
+- "Clear cached data" in Settings, for Steam prices, exchange rates, GOG
+  search results and release dates. Your synced library, wishlist and
+  ignored games are kept.
+
+### Fixed
+- Games that share a name with another game are no longer mixed up. GOG's
+  1995 "Screamer" was marked as on your Steam wishlist, with the price of
+  the new 2026 "Screamer". A match is now dropped when the two stores'
+  release years are far apart and no developer or publisher is shared.
+  The same check picks the right game for Steam prices and on the Steam
+  wishlist page.
+
 ## [0.4.2] - 2026-11-27
 
 ### Fixed
