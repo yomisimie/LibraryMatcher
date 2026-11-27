@@ -388,26 +388,29 @@ function toHit(item, exact) {
 // result only counts when its Steam release year agrees: Steam's "DOOM" is
 // the 2016 game, not GOG's "DOOM (1993)".
 async function searchSteamStore(title, cc) {
-  const wanted = normalizeTitle(title);
-  const wantedBase = baseTitle(wanted);
+  const normalized = normalizeTitle(title);
   const { title: undated, year } = splitYear(title);
-  const wantedUndated = year ? normalizeTitle(undated) : null;
   const terms = [title];
-  if (wantedBase !== wanted) terms.push(wantedBase);
+  if (baseTitle(normalized) !== normalized) terms.push(baseTitle(normalized));
   if (year) terms.push(undated);
+  // Compared as titleKey, so "DOOM II" matches "Doom 2".
+  const wanted = titleKey(normalized);
+  const wantedBase = baseTitle(wanted);
+  const wantedUndated = year ? titleKey(normalizeTitle(undated)) : null;
 
   let baseMatch = null;
   const dated = { exact: [], base: [] }; // undated-name candidates, year unchecked
   for (const term of terms) {
     const items = await storeSearch(term, cc);
-    const exact = items.find((i) => normalizeTitle(i.name) === wanted);
+    const key = (i) => titleKey(normalizeTitle(i.name));
+    const exact = items.find((i) => key(i) === wanted);
     if (exact) return toHit(exact, true);
     baseMatch ||= items.find(
-      (i) => baseTitle(normalizeTitle(i.name)) === wantedBase,
+      (i) => baseTitle(key(i)) === wantedBase,
     );
     if (!year) continue;
     for (const i of items) {
-      const name = normalizeTitle(i.name);
+      const name = key(i);
       if (name === wantedUndated) dated.exact.push(i);
       else if (baseTitle(name) === baseTitle(wantedUndated)) dated.base.push(i);
     }

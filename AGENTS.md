@@ -24,7 +24,7 @@ a target.
 | --- | --- |
 | `manifest.json` | Extension manifest. Script load order matters (shared files first). `data_collection_permissions` must list every kind of data that leaves the browser (see Publishing). |
 | `icon.svg` | Extension and toolbar icon. Original artwork: don't use Steam's or GOG's logos for it. |
-| `normalize.js` | Shared title matching: `normalizeTitle()` and `baseTitle()` (edition-stripped fallback). Used everywhere titles are compared. |
+| `normalize.js` | Shared title matching: `normalizeTitle()`, `baseTitle()` (edition-stripped fallback), `titleKey()` (Roman numerals as digits, for comparing only; stored keys stay `normalizeTitle()`), `splitYear()` / `sameYear()` (titles like "DOOM (2016)"). Used everywhere titles are compared. |
 | `ignore.js` | Shared ignore-list helpers over `storage.sync`: `getIgnored()`, `setIgnored()`, `ignoreListChanged()`. |
 | `background.js` | Steam sync (owned games, wishlist; via the Steam store session by default, or the Web API with a key), hourly auto sync via `alarms`, Steam store price lookup with caching/queueing, ECB exchange rates, message handlers, ignore-list migration, the right-click "Ignore" menu item (the content script resolves which game was clicked). Its header comment documents the storage layout; keep it current. |
 | `content.js` / `content.css` | Runs on `*.gog.com`. Finds product tiles, adds badges, price cards and the ignore button. Everything it injects has class `slm-ui`; every class it adds is listed in `MARK_CLASSES`, so `clearMarks()` can fully reset a page. |
@@ -32,6 +32,7 @@ a target.
 | `popup.html` / `popup.js` | Toolbar popup: sync status and manual sync buttons. |
 | `wishlist.html` / `wishlist.js` | "Steam wishlist on GOG" page (uses GOG's catalog and the user's GOG login cookies). |
 | `scripts/` | Dev tooling (Node): version bump, dist cleanup. Not shipped. |
+| `tests/` | Node tests (`node:test`, no dependencies) for the title matching in `normalize.js`. Not shipped. |
 
 ## Storage
 
@@ -63,15 +64,17 @@ handlers must `preventDefault()` and `stopPropagation()`.
 npm install          # web-ext (dev dependency only)
 npm start            # web-ext run: launches Firefox with the extension loaded
 npm run lint         # web-ext lint: run before committing
+npm test             # title-matching tests (Node's built-in test runner)
 npm run package      # clears dist/*.zip, builds dist/library_matcher_for_steam_gog-<version>.zip
 npm run bump         # patch bump; also: -- minor | -- major | -- 1.2.3
 ```
 
-Never edit a version by hand; see Releasing below. There are no automated
-tests: check syntax with `node --check <file>.js`, run `npm run lint`, and
-test by hand in Firefox with `npm start`.
+Never edit a version by hand; see Releasing below. Only title matching has
+automated tests; when you change `normalize.js`, add cases for the titles that
+motivated it. Everything else: check syntax with `node --check <file>.js`, run
+`npm run lint`, and test by hand in Firefox with `npm start`.
 
-The packaged zip excludes `package*.json`, `scripts/`, `dist/` and `*.md`
+The packaged zip excludes `package*.json`, `scripts/`, `tests/`, `dist/` and `*.md`
 (see `webExt.ignoreFiles` in `package.json`). A new runtime file is picked up
 automatically; a new dev-only file or folder must be added to that list.
 
@@ -85,7 +88,7 @@ Every commit is a release, made in one commit:
    an empty `## [x.y.z] - <date>` heading at the top of `CHANGELOG.md`.
 3. Under that heading, describe the changes for users, grouped as
    `### Added`, `### Changed`, `### Fixed`, `### Removed`.
-4. `npm run lint`.
+4. `npm test` and `npm run lint`.
 5. Commit everything together, titled `<summary> (x.y.z)`, and push to `main`.
 6. `npm run package` builds the upload zip in `dist/`.
 7. Write the release notes for the addons.mozilla.org upload form. Its

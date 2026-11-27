@@ -33,6 +33,21 @@ function baseTitle(normalized) {
   return base || normalized;
 }
 
+// Roman numerals as standalone words, II to XX. "I" and "X" are left out: "I"
+// is a word ("I Am Bread"), and "Mega Man X" is not "Mega Man 10".
+const ROMAN = {
+  ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, xi: 11, xii: 12,
+  xiii: 13, xiv: 14, xv: 15, xvi: 16, xvii: 17, xviii: 18, xix: 19, xx: 20,
+};
+const ROMAN_WORD = new RegExp(`\\b(?:${Object.keys(ROMAN).join("|")})\\b`, "g");
+
+// Key for comparing two normalized titles, so "DOOM II" matches "Doom 2".
+// Not stored anywhere (ignore-list keys stay plain normalized titles), so it
+// can change freely.
+function titleKey(normalized) {
+  return normalized.replace(ROMAN_WORD, (w) => String(ROMAN[w]));
+}
+
 // Stores tell same-named games apart with a year: GOG sells "DOOM (2016)" and
 // "DOOM (1993)", while Steam calls the 2016 game just "DOOM". Splits that
 // year off a raw (not normalized) title; only a parenthesized year counts,
@@ -56,5 +71,6 @@ function sameYear(a, b) {
 
 globalThis.normalizeTitle = normalizeTitle;
 globalThis.baseTitle = baseTitle;
+globalThis.titleKey = titleKey;
 globalThis.splitYear = splitYear;
 globalThis.sameYear = sameYear;

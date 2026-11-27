@@ -3,7 +3,7 @@
   "name": "Library Matcher for Steam & GOG",
   "short_name": "Library Matcher",
   "description": "While browsing GOG, marks games you already own or wishlisted on Steam, compares prices, and hides games you ignore.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "homepage_url": "https://github.com/yomisimie/LibraryMatcher",
 
   "icons": {

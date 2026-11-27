@@ -4,6 +4,15 @@ All notable changes to Library Matcher for Steam & GOG, newest first.
 `npm run bump` adds a heading for the new version; write that version's
 changes under it.
 
+## [0.4.2] - 2026-11-27
+
+### Fixed
+- Titles written with Roman numerals on one store and digits on the other
+  now match, e.g. "Final Fantasy VII" and "Final Fantasy 7". "I" and "X" are
+  left as they are, since "Mega Man X" isn't "Mega Man 10".
+- Badges and Steam prices on open GOG tabs no longer flicker while Steam
+  release years are looked up for titles like "DOOM (2016)".
+
 ## [0.4.1] - 2026-11-27
 
 ### Fixed

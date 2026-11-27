@@ -87,9 +87,11 @@ function toGogHit(p, exact, possible = false) {
 // getYear resolves to the Steam game's release year; it's only asked for
 // when GOG has the title with a year, e.g. "DOOM (2016)" for Steam's "DOOM".
 async function pickMatch(products, steamName, getYear) {
-  const want = normalizeTitle(steamName);
+  // Compared as titleKey, so "DOOM II" matches "Doom 2".
+  const key = (name) => titleKey(normalizeTitle(name));
+  const want = key(steamName);
   const wantBase = baseTitle(want);
-  const exact = products.find((p) => normalizeTitle(p.title) === want);
+  const exact = products.find((p) => key(p.title) === want);
   if (exact) return toGogHit(exact, true);
   // Prefer games over packs, then the shortest (least extra) title.
   const rank = (a, b) =>
@@ -98,7 +100,7 @@ async function pickMatch(products, steamName, getYear) {
 
   const dated = products.filter((p) => {
     const { title, year } = splitYear(p.title);
-    return year && normalizeTitle(title) === want;
+    return year && key(title) === want;
   });
   if (dated.length) {
     const steamYear = await getYear();
@@ -107,12 +109,12 @@ async function pickMatch(products, steamName, getYear) {
   }
 
   const loose = products
-    .filter((p) => baseTitle(normalizeTitle(p.title)) === wantBase)
+    .filter((p) => baseTitle(key(p.title)) === wantBase)
     .sort(rank);
   if (loose[0]) return toGogHit(loose[0], false);
 
   const prefixed = products
-    .filter((p) => normalizeTitle(p.title).startsWith(want + " "))
+    .filter((p) => key(p.title).startsWith(want + " "))
     .sort(rank);
   return prefixed[0] ? toGogHit(prefixed[0], false, true) : null;
 }

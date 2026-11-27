@@ -49,7 +49,7 @@ function buildLookup(data) {
     : Object.entries(data || {});
   for (const [name, appid] of entries) {
     // Re-normalize so lists saved by older versions still match.
-    const full = normalizeTitle(name);
+    const full = titleKey(normalizeTitle(name));
     if (!full) continue;
     map.set(full, appid);
     const base = "base:" + baseTitle(full);
@@ -60,7 +60,8 @@ function buildLookup(data) {
 
 // Returns { appid, exact } for a match (appid null for old-format lists;
 // exact false when only the edition-stripped title matched), or null.
-function lookup(map, full, raw) {
+function lookup(map, normalized, raw) {
+  const full = titleKey(normalized);
   if (map.has(full)) return { appid: map.get(full), exact: true };
   const base = "base:" + baseTitle(full);
   if (map.has(base)) return { appid: map.get(base), exact: false };
@@ -70,7 +71,7 @@ function lookup(map, full, raw) {
 // GOG's "DOOM (2016)" is plain "DOOM" on Steam, but so could another game of
 // that name be (Steam's "DOOM" is not GOG's "DOOM (1993)"), so the title
 // without the year only counts when the Steam release year agrees. Unknown
-// years are fetched in the background; storing them re-marks the page.
+// years are fetched in the background, then the waiting tiles are marked.
 function lookupUndated(map, raw) {
   const { title, year } = splitYear(raw);
   if (!year) return null;
@@ -95,8 +96,16 @@ function requestReleaseYear(appid) {
   yearRequestTimer = setTimeout(() => {
     const appids = [...pendingYears];
     pendingYears.clear();
+    // Uses the reply rather than watching storage: Steam price lookups store
+    // years too, and redrawing every GOG tab for each of those made badges
+    // flicker. markOwnedGames only adds what's missing, no reset needed.
     browser.runtime
       .sendMessage({ action: "release_years", appids })
+      .then((years) => {
+        if (!years || !Object.keys(years).length) return;
+        Object.assign(releaseYears, years);
+        markOwnedGames();
+      })
       .catch(() => {});
   }, 100);
 }
@@ -122,7 +131,7 @@ async function loadLists() {
   // "Foo Deluxe Edition" into "foo" and mark the base game as owned.
   ownedDlc = new Map(
     Object.entries(data.steamOwnedDlc || {}).map(([name, appid]) => [
-      normalizeTitle(name),
+      titleKey(normalizeTitle(name)),
       appid,
     ]),
   );
@@ -628,7 +637,10 @@ async function markOwnedGames() {
     const ownedGame = lookup(ownedMap, gogTitle, rawTitle);
     const owned =
       ownedGame ||
-      (ownedDlc.has(gogTitle) && { appid: ownedDlc.get(gogTitle), dlc: true });
+      (ownedDlc.has(titleKey(gogTitle)) && {
+        appid: ownedDlc.get(titleKey(gogTitle)),
+        dlc: true,
+      });
     if (owned) {
       if (tile.querySelector(".steam-owned-badge")) return;
       tile.classList.remove("slm-wishlist");
@@ -700,7 +712,6 @@ const WATCHED_KEYS = [
   "steamCountry",
   "dimIgnoredGames",
   "gogCurrency",
-  "steamReleaseYears",
 ];
 browser.storage.onChanged.addListener((changes, area) => {
   // Ignore-list changes arrive via sync, including from other devices.
